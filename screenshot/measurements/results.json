@@ -1,0 +1,123 @@
+{
+  "date": "2026-10-16",
+  "system": "Plasma/Spectacle 6.6.6, Wayland, Qt 6.10.2, NVIDIA 595.99.02 / RTX 4090, three monitors at scale 1",
+  "measurement": "uinput key events, KWin windowAdded timestamps, inotify CLOSE_WRITE, journal API timestamp, focused Qt Wayland client QClipboard.image readback. Event timestamps have scheduling noise; these are software timings, not camera measurements.",
+  "region": "Before 401x241; after 451/501/551x241, neutral test window. Larger or complex images take longer to encode.",
+  "before": [
+    {
+      "trial": 1,
+      "launch_first_overlay_ms": 1119.22,
+      "launch_all_overlays_ms": 1207.22,
+      "release_file_closed_ms": 72.66,
+      "file_closed_clipboard_api_ms": 97.04,
+      "release_clipboard_api_ms": 169.69,
+      "release_native_image_ms": 179.81
+    },
+    {
+      "trial": 2,
+      "launch_first_overlay_ms": 1055.92,
+      "launch_all_overlays_ms": 1151.92,
+      "release_file_closed_ms": 10.1,
+      "file_closed_clipboard_api_ms": 170.21,
+      "release_clipboard_api_ms": 180.31,
+      "release_native_image_ms": 186.94
+    },
+    {
+      "trial": 3,
+      "launch_first_overlay_ms": 982.67,
+      "launch_all_overlays_ms": 1089.66,
+      "release_file_closed_ms": 20.78,
+      "file_closed_clipboard_api_ms": 158.14,
+      "release_clipboard_api_ms": 178.92,
+      "release_native_image_ms": 192.23
+    }
+  ],
+  "after": [
+    {
+      "trial": 1,
+      "launch_first_overlay_ms": 292.65,
+      "launch_all_overlays_ms": 479.65,
+      "release_file_closed_ms": 9.6,
+      "file_closed_clipboard_api_ms": 16.15,
+      "release_clipboard_api_ms": 25.75,
+      "release_native_image_ms": 32.15
+    },
+    {
+      "trial": 2,
+      "launch_first_overlay_ms": 298.66,
+      "launch_all_overlays_ms": 452.66,
+      "release_file_closed_ms": 15.31,
+      "file_closed_clipboard_api_ms": 1.24,
+      "release_clipboard_api_ms": 16.55,
+      "release_native_image_ms": 23.08
+    },
+    {
+      "trial": 3,
+      "launch_first_overlay_ms": 423.73,
+      "launch_all_overlays_ms": 592.73,
+      "release_file_closed_ms": 10.1,
+      "file_closed_clipboard_api_ms": -0.66,
+      "release_clipboard_api_ms": 9.44,
+      "release_native_image_ms": 16.47
+    }
+  ],
+  "before_median_ms": {
+    "launch_first_overlay_ms": 1055.92,
+    "launch_all_overlays_ms": 1151.92,
+    "release_file_closed_ms": 20.78,
+    "file_closed_clipboard_api_ms": 158.14,
+    "release_clipboard_api_ms": 178.92,
+    "release_native_image_ms": 186.94
+  },
+  "after_median_ms": {
+    "launch_first_overlay_ms": 298.66,
+    "launch_all_overlays_ms": 479.65,
+    "release_file_closed_ms": 10.1,
+    "file_closed_clipboard_api_ms": 1.24,
+    "release_clipboard_api_ms": 16.55,
+    "release_native_image_ms": 23.08
+  },
+  "render_comparison": {
+    "default-basic-OpenGL": {
+      "main_monitor_commits": 28,
+      "median_interval_ms": 15.86,
+      "p95_interval_ms": 43.22,
+      "maximum_interval_ms": 45.87,
+      "method": "WAYLAND_DEBUG client wl_surface commits on DP-5 during 100 injected moves over 500 ms; identical tracing across backends. Not physical input-to-photon latency."
+    },
+    "threaded-OpenGL": {
+      "main_monitor_commits": 73,
+      "median_interval_ms": 6.41,
+      "p95_interval_ms": 11.16,
+      "maximum_interval_ms": 17.5,
+      "method": "WAYLAND_DEBUG client wl_surface commits on DP-5 during 100 injected moves over 500 ms; identical tracing across backends. Not physical input-to-photon latency."
+    },
+    "threaded-Vulkan": {
+      "main_monitor_commits": 74,
+      "median_interval_ms": 6.02,
+      "p95_interval_ms": 9.38,
+      "maximum_interval_ms": 68.74,
+      "method": "WAYLAND_DEBUG client wl_surface commits on DP-5 during 100 injected moves over 500 ms; identical tracing across backends. Not physical input-to-photon latency."
+    },
+    "software": {
+      "main_monitor_commits": 17,
+      "median_interval_ms": 22.22,
+      "p95_interval_ms": 102.29,
+      "maximum_interval_ms": 114.12,
+      "method": "WAYLAND_DEBUG client wl_surface commits on DP-5 during 100 injected moves over 500 ms; identical tracing across backends. Not physical input-to-photon latency."
+    }
+  },
+  "verification": {
+    "wayland_ctrl_v": "501x241 image pasted and painted in native Qt test app",
+    "xwayland_ctrl_v_after_restart": "551x241 image pasted and painted in xcb Qt test app",
+    "wl_paste": "image/png advertised, 1241-byte PNG decoded as 551x241 after restart/capture",
+    "empty_selection": "7920x1440 discarded; retry requested 750 ms later; no full-desktop clipboard offer",
+    "escape": "all three retry overlay windows removed; no PNG or clipboard write",
+    "restart": "new service and idle Spectacle started; subsequent real shortcut and XWayland paste succeeded; clipboard image itself does not survive owner restart",
+    "shortcut": "live KGlobalAccel component quick-region-screenshot-v3.desktop, key 301989971",
+    "install_idempotence": "Final installer succeeded using desktop-session KSycoca environment; service MainPID stayed 2551751; key registration remained v3 / Meta+Shift+S.",
+    "static": "c++ -std=c++17 -O2 -Wall -Wextra -fPIC build, bash -n, shellcheck, desktop-file-validate and unit validation passed; unrelated pre-existing spice-vdagent unit warning.",
+    "clipboard_cleanup": "Initial clipboard snapshot discarded without restoring it because fresh independent user captures replaced the test images; current clipboard verified valid and not a test fixture.",
+    "cleanup": "Measurement KWin script unloaded; no measurement Python processes or uinput devices left; owned scratch removed. User service and idle Spectacle intentionally retained."
+  }
+}

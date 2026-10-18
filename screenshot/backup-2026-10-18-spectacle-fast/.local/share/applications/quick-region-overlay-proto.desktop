@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Quick Region Overlay Prototype
+Comment=Authorization for the KWin ScreenShot2 prototype
+Exec=/home/mjstanton/Projects/desktop-config/screenshot/prototype-overlay/build/quick-region-overlay-proto
+NoDisplay=true
+Terminal=false
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2

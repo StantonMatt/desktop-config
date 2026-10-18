@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.local.QuickRegionOverlay
+Exec=/usr/bin/systemctl --user start quick-region-overlay.service
+SystemdService=quick-region-overlay.service

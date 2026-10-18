@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Quick Region Overlay
+Comment=Authorization for the frozen screen capture overlay
+Exec=@HOME@/.local/libexec/quick-region-overlay --capture
+NoDisplay=true
+Terminal=false
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2

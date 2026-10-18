@@ -1,0 +1,187 @@
+// Daemon decision checks for quick-region-overlay. Run: ctest --test-dir <build dir> --output-on-failure
+#include "../daemon-logic.h"
+#include <QTest>
+
+using namespace DaemonLogic;
+using namespace std::chrono_literals;
+using Flow = CaptureFlow;
+
+class DaemonLogicTest final : public QObject {
+    Q_OBJECT
+private slots:
+    void commands() {
+        QCOMPARE(parseCommand({QStringLiteral("--capture")}), Command::Capture);
+        QCOMPARE(parseCommand({QStringLiteral("--daemon")}), Command::Daemon);
+        QCOMPARE(parseCommand({}), Command::Usage);
+        QCOMPARE(parseCommand({QStringLiteral("--daemon"), QStringLiteral("--capture")}), Command::Usage);
+        QCOMPARE(parseCommand({QStringLiteral("--capture"), QStringLiteral("extra")}), Command::Usage);
+        QCOMPARE(parseCommand({QStringLiteral("daemon")}), Command::Usage);
+        QCOMPARE(usageStatus, 2);
+    }
+    void alreadyRunningExitsThree() {
+        QCOMPARE(alreadyRunning(true), std::optional<int>(3));
+        QCOMPARE(alreadyRunning(false), std::nullopt);
+    }
+    void shortcutStatusText() {
+        const QKeySequence metaShiftS(Qt::META | Qt::SHIFT | Qt::Key_S);
+        const QKeySequence metaF12(Qt::META | Qt::Key_F12);
+        QCOMPARE(shortcutStatus({metaShiftS}, {}), QStringLiteral("registered:Meta+Shift+S"));
+        QCOMPARE(shortcutStatus({metaShiftS, metaF12}, {}), QStringLiteral("registered:Meta+Shift+S; Meta+F12"));
+        QCOMPARE(shortcutStatus({QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_S), QKeySequence(Qt::Key_Print)}, {}), QStringLiteral("registered:Meta+Shift+S; Print"));
+        // A chord keeps its later keys after ", ", so install.sh's "; " split can't take it for Meta+Shift+S.
+        const QKeySequence chord(Qt::META | Qt::SHIFT | Qt::Key_S, Qt::CTRL | Qt::Key_C);
+        QCOMPARE(shortcutStatus({chord, QKeySequence(Qt::Key_Print)}, {}), QStringLiteral("registered:Meta+Shift+S, Ctrl+C; Print"));
+        // Keys win over owners: the owners list only explains an empty binding.
+        QCOMPARE(shortcutStatus({metaF12}, {QStringLiteral("other/action")}), QStringLiteral("registered:Meta+F12"));
+        // KGlobalAccel reports a cleared binding as an empty sequence.
+        QCOMPARE(shortcutStatus({QKeySequence()}, {}), QStringLiteral("none"));
+        QCOMPARE(shortcutStatus({}, {}), QStringLiteral("none"));
+        QCOMPARE(shortcutStatus({}, {QStringLiteral("quick-region-screenshot-v3.desktop/_launch")}), QStringLiteral("none:quick-region-screenshot-v3.desktop/_launch"));
+        QCOMPARE(shortcutStatus({}, {QStringLiteral("a/b"), QStringLiteral("c/d")}), QStringLiteral("none:a/b, c/d"));
+        // Two defaults KGlobalAccel couldn't grant come back as two empty sequences: no keys, so the owners show.
+        QCOMPARE(shortcutStatus({QKeySequence(), QKeySequence()}, {QStringLiteral("a/b")}), QStringLiteral("none:a/b"));
+    }
+    void activeKeysDropEmptySequences() {
+        QVERIFY(activeKeys({QKeySequence(), QKeySequence()}).isEmpty());
+        QVERIFY(activeKeys({}).isEmpty());
+        const QKeySequence print(Qt::Key_Print);
+        QCOMPARE(activeKeys({QKeySequence(), print}), QList<QKeySequence>{print});
+    }
+    void keySequencesFromShortcutKeys() {
+        // Recorded shortcutKeys sequences: [[301989971,0,0,0]] and [[16777225,0,0,0]].
+        QCOMPARE(keySequence({301989971, 0, 0, 0}), QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_S));
+        QCOMPARE(keySequence({16777225, 0, 0, 0}), QKeySequence(Qt::Key_Print));
+        const QKeySequence chord = keySequence({301989971, (Qt::CTRL | Qt::Key_C).toCombined(), 0, 0});
+        QCOMPARE(chord.count(), 2);
+        QCOMPARE(chord, QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_S, Qt::CTRL | Qt::Key_C));
+        QCOMPARE(keySequence({1, 2, 3, 4, 5}).count(), 4);
+        QCOMPARE(keySequence({16777225}), QKeySequence(Qt::Key_Print));
+        QVERIFY(keySequence({0, 0, 0, 0}).isEmpty());
+        QVERIFY(keySequence({}).isEmpty());
+    }
+    void captureSerialDiscardsStaleReplies() {
+        Flow flow;
+        flow.pressed(Flow::Clock::time_point{0ms});
+        const quint64 first = flow.begin();
+        QVERIFY(flow.isCurrent(first));
+        QVERIFY(flow.busy());
+        QVERIFY(flow.layoutChanged());     // aborted the capture in flight
+        QVERIFY(!flow.isCurrent(first));   // its late reply is dropped
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{100ms}), Flow::AfterRebuild::Retry);
+        const quint64 second = flow.begin();
+        QVERIFY(second != first);
+        QVERIFY(!flow.isCurrent(first));
+        QVERIFY(flow.isCurrent(second));
+    }
+    void pressSurvivesRepeatedLayoutChanges() {
+        Flow flow;
+        flow.pressed(Flow::Clock::time_point{0ms});
+        for (int change = 1; change <= 5; ++change) {
+            flow.begin();
+            QVERIFY(flow.layoutChanged());
+            QVERIFY(flow.busy());   // a second press now is busy, not a second capture
+            QCOMPARE(flow.rebuilt(Flow::Clock::time_point{change * 300ms}), Flow::AfterRebuild::Retry);
+        }
+        flow.begin();
+        flow.captured();
+        QVERIFY(flow.overlayShown());
+        // A layout change with the overlay open aborts no capture; the caller closes the overlay.
+        QVERIFY(!flow.layoutChanged());
+        flow.closed();
+        QVERIFY(!flow.busy());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{5s}), Flow::AfterRebuild::Nothing);
+    }
+    void staleShapeRetriesAfterRebuild() {
+        Flow flow;
+        flow.pressed(Flow::Clock::time_point{0ms});
+        const quint64 serial = flow.begin();
+        flow.retryAfterRebuild();          // the reply was rendered for another layout
+        QVERIFY(!flow.isCurrent(serial));
+        QVERIFY(!flow.layoutChanged());    // the rebuild the caller schedules; nothing in flight any more
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{250ms}), Flow::AfterRebuild::Retry);
+    }
+    void pressDuringRebuildCapturesAfterIt() {
+        Flow flow;
+        flow.pressed(Flow::Clock::time_point{0ms});
+        flow.defer();
+        QVERIFY(flow.busy());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{10ms}), Flow::AfterRebuild::Retry);
+        QVERIFY(!flow.busy());
+    }
+    void pressGivesUpAfterTwoSeconds() {
+        Flow flow;
+        flow.pressed(Flow::Clock::time_point{0ms});
+        flow.begin();
+        QVERIFY(flow.layoutChanged());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{Flow::giveUp}), Flow::AfterRebuild::Retry);
+        flow.begin();
+        QVERIFY(flow.layoutChanged());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{Flow::giveUp + 1ms}), Flow::AfterRebuild::Dropped);
+        QVERIFY(!flow.busy());
+        // The next press starts afresh.
+        flow.pressed(Flow::Clock::time_point{10s});
+        flow.begin();
+        QVERIFY(flow.layoutChanged());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{10s + 100ms}), Flow::AfterRebuild::Retry);
+    }
+    void secondShapeMismatchFails() {
+        Flow flow;
+        flow.pressed(Flow::Clock::time_point{0ms});
+        const quint64 first = flow.begin();
+        QVERIFY(flow.retryShape());        // the first mismatch retries after a rebuild
+        QVERIFY(!flow.isCurrent(first));
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{250ms}), Flow::AfterRebuild::Retry);
+        const quint64 second = flow.begin();
+        QVERIFY(!flow.retryShape());       // the second in the same press fails
+        QVERIFY(flow.isCurrent(second));   // retryShape left it to the caller's failed()
+        flow.failed();
+        QVERIFY(!flow.busy());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{300ms}), Flow::AfterRebuild::Nothing);
+        // A layout change between the mismatches doesn't reset the count; only a new press does.
+        flow.pressed(Flow::Clock::time_point{1s});
+        flow.begin();
+        QVERIFY(flow.retryShape());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{1s + 250ms}), Flow::AfterRebuild::Retry);
+        flow.begin();
+        QVERIFY(flow.layoutChanged());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{1s + 300ms}), Flow::AfterRebuild::Retry);
+        flow.begin();
+        QVERIFY(!flow.retryShape());
+        flow.failed();
+        flow.pressed(Flow::Clock::time_point{5s});
+        flow.begin();
+        QVERIFY(flow.retryShape());
+    }
+    void shortcutPressCancelsOpenOverlay() {
+        Flow flow;
+        QCOMPARE(flow.shortcutPress(), Flow::Press::Capture);
+        flow.pressed(Flow::Clock::time_point{0ms});
+        flow.begin();
+        QCOMPARE(flow.shortcutPress(), Flow::Press::Busy);     // a capture in flight ignores presses
+        flow.captured();
+        QCOMPARE(flow.shortcutPress(), Flow::Press::Cancel);   // an open overlay closes
+        flow.closed();
+        QCOMPARE(flow.shortcutPress(), Flow::Press::Capture);
+        // A press waiting for a rebuild, or retrying after a layout change, is busy too.
+        flow.pressed(Flow::Clock::time_point{1s});
+        flow.defer();
+        QCOMPARE(flow.shortcutPress(), Flow::Press::Busy);
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{1s + 10ms}), Flow::AfterRebuild::Retry);
+        flow.begin();
+        QVERIFY(flow.layoutChanged());
+        QCOMPARE(flow.shortcutPress(), Flow::Press::Busy);
+    }
+    void failedCaptureEndsThePress() {
+        Flow flow;
+        flow.pressed(Flow::Clock::time_point{0ms});
+        const quint64 serial = flow.begin();
+        flow.failed();
+        QVERIFY(!flow.isCurrent(serial));
+        QVERIFY(!flow.busy());
+        QVERIFY(!flow.layoutChanged());
+        QCOMPARE(flow.rebuilt(Flow::Clock::time_point{100ms}), Flow::AfterRebuild::Nothing);
+    }
+};
+
+QTEST_APPLESS_MAIN(DaemonLogicTest)
+#include "daemon-logic-test.moc"

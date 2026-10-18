@@ -1,0 +1,56 @@
+{"t": 1792320370102, "event": "probe-changed"}
+{"t": 1792320370107, "event": "probe-png-decoded", "message": "334x178"}
+{"t": 1792320372485, "event": "trial", "trial": 1}
+{"t": 1792320372785, "event": "press"}
+{"t": 1792320372828, "event": "daemon", "message": "capture-request"}
+{"t": 1792320372828, "event": "daemon", "message": "capture-dispatched warm"}
+{"t": 1792320373189, "event": "kwin", "message": "added 1792320373189 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792320373287, "event": "kwin", "message": "added 1792320373287 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792320373360, "event": "kwin", "message": "added 1792320373360 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792320374285, "event": "button-down"}
+{"t": 1792320374586, "event": "release"}
+{"t": 1792320374592, "event": "kwin", "message": "removed 1792320374592 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792320374592, "event": "kwin", "message": "removed 1792320374592 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792320374593, "event": "kwin", "message": "removed 1792320374593 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792320374600, "event": "daemon", "message": "clipboard-set png_bytes=11576"}
+{"t": 1792320374600, "event": "daemon", "message": "clipboard-offer 334x178 png_bytes=11576"}
+{"t": 1792320374600, "event": "probe-changed"}
+{"t": 1792320374604, "event": "probe-png-decoded", "message": "334x178"}
+{"t": 1792320374752, "event": "daemon", "message": "spectacle-exit code=0"}
+{"t": 1792320374763, "event": "daemon", "message": "spectacle-start pid=3695842 mode=idle-dbus"}
+{"t": 1792320376586, "event": "trial", "trial": 2}
+{"t": 1792320376886, "event": "press"}
+{"t": 1792320376918, "event": "daemon", "message": "capture-request"}
+{"t": 1792320376918, "event": "daemon", "message": "capture-dispatched warm"}
+{"t": 1792320377221, "event": "kwin", "message": "added 1792320377221 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792320377314, "event": "kwin", "message": "added 1792320377314 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792320377389, "event": "kwin", "message": "added 1792320377389 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792320378386, "event": "button-down"}
+{"t": 1792320378687, "event": "release"}
+{"t": 1792320378696, "event": "kwin", "message": "removed 1792320378696 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792320378696, "event": "kwin", "message": "removed 1792320378696 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792320378696, "event": "kwin", "message": "removed 1792320378696 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792320378704, "event": "daemon", "message": "clipboard-set png_bytes=11576"}
+{"t": 1792320378704, "event": "daemon", "message": "clipboard-offer 334x178 png_bytes=11576"}
+{"t": 1792320378704, "event": "probe-changed"}
+{"t": 1792320378709, "event": "probe-png-decoded", "message": "334x178"}
+{"t": 1792320378875, "event": "daemon", "message": "spectacle-exit code=0"}
+{"t": 1792320378877, "event": "daemon", "message": "spectacle-start pid=3695988 mode=idle-dbus"}
+{"t": 1792320380687, "event": "trial", "trial": 3}
+{"t": 1792320380987, "event": "press"}
+{"t": 1792320381017, "event": "daemon", "message": "capture-request"}
+{"t": 1792320381017, "event": "daemon", "message": "capture-dispatched warm"}
+{"t": 1792320381319, "event": "kwin", "message": "added 1792320381319 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792320381399, "event": "kwin", "message": "added 1792320381399 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792320381499, "event": "kwin", "message": "added 1792320381499 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792320382487, "event": "button-down"}
+{"t": 1792320382788, "event": "release"}
+{"t": 1792320382799, "event": "kwin", "message": "removed 1792320382799 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792320382800, "event": "kwin", "message": "removed 1792320382800 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792320382800, "event": "kwin", "message": "removed 1792320382800 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792320382806, "event": "daemon", "message": "clipboard-set png_bytes=11576"}
+{"t": 1792320382806, "event": "daemon", "message": "clipboard-offer 334x178 png_bytes=11576"}
+{"t": 1792320382807, "event": "probe-changed"}
+{"t": 1792320382810, "event": "probe-png-decoded", "message": "334x178"}
+{"t": 1792320382975, "event": "daemon", "message": "spectacle-exit code=0"}
+{"t": 1792320382984, "event": "daemon", "message": "spectacle-start pid=3696119 mode=idle-dbus"}

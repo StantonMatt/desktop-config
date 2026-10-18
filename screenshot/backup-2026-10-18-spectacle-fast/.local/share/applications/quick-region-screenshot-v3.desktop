@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Quick Region Screenshot
+Comment=Copy a selected screen region directly to the clipboard
+Exec=/home/mjstanton/.local/bin/quick-region-screenshot
+Icon=spectacle
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+Categories=Utility;
+X-KDE-Shortcuts=Meta+Shift+S

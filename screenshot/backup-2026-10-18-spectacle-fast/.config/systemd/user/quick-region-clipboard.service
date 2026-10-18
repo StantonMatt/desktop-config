@@ -1,0 +1,16 @@
+[Unit]
+Description=Quick region screenshot and native Wayland clipboard service
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.local.QuickRegion
+Environment=QT_QPA_PLATFORM=wayland
+ExecStart=%h/.local/libexec/quick-region-clipboard-service
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5
+
+[Install]
+WantedBy=default.target

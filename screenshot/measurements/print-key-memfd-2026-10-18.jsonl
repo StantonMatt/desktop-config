@@ -1,0 +1,18 @@
+{"t": 1792321542389, "event": "probe-changed"}
+{"t": 1792321542422, "event": "probe-png-decoded", "message": "501x301"}
+{"t": 1792321544812, "event": "trial", "trial": 1}
+{"t": 1792321545112, "event": "print"}
+{"t": 1792321545419, "event": "spectacle", "message": "spectacle: Attempting to use Tesseract library \"libtesseract.so.5\""}
+{"t": 1792321545419, "event": "spectacle", "message": "spectacle: Detected Tesseract version \"5.5.0\""}
+{"t": 1792321545419, "event": "spectacle", "message": "spectacle: Loaded Tesseract runtime library from \"libtesseract.so.5\""}
+{"t": 1792321545721, "event": "kwin", "message": "added 1792321545721 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792321545737, "event": "kwin", "message": "added 1792321545737 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792321545770, "event": "kwin", "message": "added 1792321545770 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792321546613, "event": "button-down"}
+{"t": 1792321546913, "event": "release"}
+{"t": 1792321546915, "event": "kwin", "message": "removed 1792321546915 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792321546916, "event": "kwin", "message": "removed 1792321546916 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792321546916, "event": "kwin", "message": "removed 1792321546916 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792321546920, "event": "daemon", "message": "clipboard-offer-handoff 301x201"}
+{"t": 1792321546921, "event": "probe-changed"}
+{"t": 1792321546925, "event": "probe-png-decoded", "message": "301x201"}

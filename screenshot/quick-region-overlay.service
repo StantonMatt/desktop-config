@@ -1,0 +1,24 @@
+[Unit]
+Description=Quick region frozen overlay and native Wayland clipboard
+After=graphical-session.target
+PartOf=graphical-session.target
+# D-Bus activation outside a graphical session fails here instead of starting a daemon that can't reach a compositor.
+# Starting with the session is unaffected: graphical-session.target pulls this unit into its own start transaction.
+Requisite=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.local.QuickRegionOverlay
+Environment=QT_QPA_PLATFORM=wayland
+# The session environment sets QT_WAYLAND_RECONNECT=1, but the daemon's layer-shell windows don't survive a reconnect: after a KWin
+# crash it spun on the dead connection. Without it Qt exits with status 255 and Restart=on-failure starts it again.
+UnsetEnvironment=QT_WAYLAND_RECONNECT
+ExecStart=%h/.local/libexec/quick-region-overlay --daemon
+Restart=on-failure
+# Exit status 3: another process owns org.local.QuickRegionOverlay; restarting would only fail again.
+RestartPreventExitStatus=3
+RestartSec=1
+TimeoutStopSec=5
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,15 @@
+[General]
+clipboardGroup=PostScreenshotCopyImage
+useReleaseToCapture=true
+
+[ImageSave]
+lastImageSaveAsLocation=file:///run/user/1000/quick-region-screenshot.MuC4D0.png
+lastImageSaveLocation=file:///run/user/1000/quick-region-screenshot.png
+translatedScreenshotsFolder=Screenshots
+
+[VideoSave]
+translatedScreencastsFolder=Screencasts
+
+[ViewerWindow]
+2 screens: Height=570
+2 screens: Width=814

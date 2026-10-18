@@ -1,0 +1,14 @@
+{"t": 1792321283565, "event": "probe-changed"}
+{"t": 1792321283568, "event": "probe-png-decoded", "message": "360x1"}
+{"t": 1792321286042, "event": "trial", "trial": 1}
+{"t": 1792321286060, "event": "kwin", "message": "removed 1792321286060 plasma-visual-screensaver 2560,0 3440x1440"}
+{"t": 1792321286061, "event": "kwin", "message": "removed 1792321286061 plasma-visual-screensaver 0,0 2560x1440"}
+{"t": 1792321286061, "event": "kwin", "message": "removed 1792321286061 plasma-visual-screensaver 6000,195 1920x1080"}
+{"t": 1792321286342, "event": "press"}
+{"t": 1792321286381, "event": "daemon", "message": "capture-request"}
+{"t": 1792321286381, "event": "daemon", "message": "capture-dispatched warm"}
+{"t": 1792321287772, "event": "kwin", "message": "added 1792321287772 org.kde.spectacle 0,0 2560x1440"}
+{"t": 1792321287843, "event": "button-down"}
+{"t": 1792321287854, "event": "kwin", "message": "added 1792321287854 org.kde.spectacle 6000,195 1920x1080"}
+{"t": 1792321287928, "event": "kwin", "message": "added 1792321287928 org.kde.spectacle 2560,0 3440x1440"}
+{"t": 1792321288143, "event": "release"}

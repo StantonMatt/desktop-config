@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+# Also works just after a manual service stop; the desktop shortcut uses DBus activation.
+systemctl --user start quick-region-clipboard.service
+exec /usr/bin/qdbus6 org.local.QuickRegion / org.local.QuickRegion.Capture

@@ -1,0 +1,14 @@
+[Unit]
+Description=Quick region screenshot clipboard service
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+Environment=QT_QPA_PLATFORM=xcb
+ExecStart=/usr/bin/python3 /home/mjstanton/.local/libexec/quick-region-clipboard-service.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

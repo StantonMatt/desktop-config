@@ -1,0 +1,39 @@
+sc-bigpipe trial=0 first_reply=17.5 last_reply=48.8 first_done=30.1 last_done=57.0 HDMI-A-5:17.5/30.1 DP-5:38.4/57.0 DP-4:48.8/55.2
+sc-bigpipe trial=0 first_reply=18.2 last_reply=49.7 first_done=35.0 last_done=57.9 HDMI-A-5:18.2/35.0 DP-5:38.6/56.7 DP-4:49.7/57.9
+sc-bigpipe trial=0 first_reply=19.5 last_reply=51.7 first_done=34.3 last_done=60.0 HDMI-A-5:19.5/34.3 DP-5:41.0/57.8 DP-4:51.7/60.0
+sc-bigpipe trial=1 first_reply=16.9 last_reply=49.5 first_done=30.4 last_done=57.6 HDMI-A-5:16.9/30.4 DP-5:38.9/55.2 DP-4:49.5/57.6
+sc-bigpipe trial=1 first_reply=16.9 last_reply=50.4 first_done=30.6 last_done=57.6 HDMI-A-5:16.9/30.6 DP-5:40.1/55.3 DP-4:50.4/57.6
+sc-bigpipe trial=1 first_reply=17.2 last_reply=47.8 first_done=30.2 last_done=53.2 HDMI-A-5:17.2/30.2 DP-5:37.4/52.3 DP-4:47.8/53.2
+sc-memfd trial=0 first_reply=16.2 last_reply=48.2 first_done=22.3 last_done=51.5 HDMI-A-5:16.2/22.3 DP-5:37.5/45.0 DP-4:48.2/51.5
+sc-memfd trial=0 first_reply=17.4 last_reply=49.3 first_done=23.5 last_done=52.6 HDMI-A-5:17.4/23.5 DP-5:38.8/47.3 DP-4:49.3/52.6
+sc-memfd trial=0 first_reply=19.2 last_reply=50.2 first_done=25.0 last_done=53.1 HDMI-A-5:19.2/25.0 DP-5:40.1/48.4 DP-4:50.2/53.1
+sc-memfd trial=1 first_reply=16.7 last_reply=51.7 first_done=22.2 last_done=55.1 HDMI-A-5:16.7/22.2 DP-5:40.8/46.7 DP-4:51.7/55.1
+sc-memfd trial=1 first_reply=17.1 last_reply=49.0 first_done=23.3 last_done=52.3 HDMI-A-5:17.1/23.3 DP-5:38.1/46.0 DP-4:49.0/52.3
+sc-memfd trial=1 first_reply=17.4 last_reply=47.5 first_done=23.5 last_done=50.4 HDMI-A-5:17.4/23.5 DP-5:37.8/42.6 DP-4:47.5/50.4
+sc-pipe trial=0 first_reply=16.7 last_reply=55.3 first_done=30.6 last_done=64.5 HDMI-A-5:16.7/30.6 DP-5:42.2/60.2 DP-4:55.3/64.5
+sc-pipe trial=0 first_reply=16.8 last_reply=49.4 first_done=30.8 last_done=58.4 HDMI-A-5:16.8/30.8 DP-5:39.0/57.3 DP-4:49.4/58.4
+sc-pipe trial=0 first_reply=17.6 last_reply=50.3 first_done=33.0 last_done=58.7 HDMI-A-5:17.6/33.0 DP-5:37.8/55.1 DP-4:50.3/58.7
+sc-pipe trial=1 first_reply=16.0 last_reply=49.8 first_done=30.9 last_done=60.2 HDMI-A-5:16.0/30.9 DP-5:37.8/50.5 DP-4:49.8/60.2
+sc-pipe trial=1 first_reply=16.6 last_reply=56.9 first_done=32.5 last_done=63.6 HDMI-A-5:16.6/32.5 DP-5:41.0/56.2 DP-4:56.9/63.6
+sc-pipe trial=1 first_reply=16.7 last_reply=50.1 first_done=32.1 last_done=56.5 HDMI-A-5:16.7/32.1 DP-5:39.7/56.2 DP-4:50.1/56.5
+ws-bigpipe trial=0 first_reply=45.3 last_reply=45.3 first_done=87.1 last_done=87.1 ws:45.3/87.1
+ws-bigpipe trial=0 first_reply=46.6 last_reply=46.6 first_done=87.3 last_done=87.3 ws:46.6/87.3
+ws-bigpipe trial=0 first_reply=49.5 last_reply=49.5 first_done=83.2 last_done=83.2 ws:49.5/83.2
+ws-bigpipe trial=1 first_reply=43.7 last_reply=43.7 first_done=80.4 last_done=80.4 ws:43.7/80.4
+ws-bigpipe trial=1 first_reply=44.7 last_reply=44.7 first_done=79.1 last_done=79.1 ws:44.7/79.1
+ws-bigpipe trial=1 first_reply=45.1 last_reply=45.1 first_done=76.4 last_done=76.4 ws:45.1/76.4
+ws-memfd-nohide trial=0 first_reply=48.1 last_reply=48.1 first_done=60.3 last_done=60.3 ws:48.1/60.3
+ws-memfd-nohide trial=0 first_reply=48.1 last_reply=48.1 first_done=66.5 last_done=66.5 ws:48.1/66.5
+ws-memfd-nohide trial=0 first_reply=48.2 last_reply=48.2 first_done=60.7 last_done=60.7 ws:48.2/60.7
+ws-memfd trial=0 first_reply=45.0 last_reply=45.0 first_done=58.0 last_done=58.0 ws:45.0/58.0
+ws-memfd trial=0 first_reply=45.4 last_reply=45.4 first_done=60.1 last_done=60.1 ws:45.4/60.1
+ws-memfd trial=0 first_reply=47.4 last_reply=47.4 first_done=60.1 last_done=60.1 ws:47.4/60.1
+ws-memfd trial=1 first_reply=44.2 last_reply=44.2 first_done=56.1 last_done=56.1 ws:44.2/56.1
+ws-memfd trial=1 first_reply=47.3 last_reply=47.3 first_done=65.3 last_done=65.3 ws:47.3/65.3
+ws-memfd trial=1 first_reply=49.0 last_reply=49.0 first_done=64.5 last_done=64.5 ws:49.0/64.5
+ws-pipe trial=0 first_reply=43.7 last_reply=43.7 first_done=82.4 last_done=82.4 ws:43.7/82.4
+ws-pipe trial=0 first_reply=44.6 last_reply=44.6 first_done=88.7 last_done=88.7 ws:44.6/88.7
+ws-pipe trial=0 first_reply=47.0 last_reply=47.0 first_done=80.6 last_done=80.6 ws:47.0/80.6
+ws-pipe trial=1 first_reply=43.0 last_reply=43.0 first_done=85.8 last_done=85.8 ws:43.0/85.8
+ws-pipe trial=1 first_reply=45.0 last_reply=45.0 first_done=84.2 last_done=84.2 ws:45.0/84.2
+ws-pipe trial=1 first_reply=46.1 last_reply=46.1 first_done=88.7 last_done=88.7 ws:46.1/88.7

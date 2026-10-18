@@ -1,0 +1,127 @@
+{"t": 1792321119295, "event": "probe-changed"}
+{"t": 1792321119295, "event": "probe-png-decoded", "message": "360x1"}
+{"t": 1792321121739, "event": "trial", "trial": 1}
+{"t": 1792321122140, "event": "press"}
+{"t": 1792321122141, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792321122141, "event": "daemon", "message": "capture-request mode=screens"}
+{"t": 1792321122165, "event": "daemon", "message": "capture-part HDMI-A-5 reply_ms=20 data_ms=24 image=2560x1440 format=6"}
+{"t": 1792321122165, "event": "daemon", "message": "overlay-shown HDMI-A-5 ms=24 shown=1/3"}
+{"t": 1792321122175, "event": "daemon", "message": "capture-part DP-4 reply_ms=32 data_ms=34 image=1920x1080 format=6"}
+{"t": 1792321122175, "event": "daemon", "message": "overlay-shown DP-4 ms=34 shown=2/3"}
+{"t": 1792321122198, "event": "daemon", "message": "capture-part DP-5 reply_ms=52 data_ms=57 image=3440x1440 format=6"}
+{"t": 1792321122198, "event": "daemon", "message": "overlay-shown DP-5 ms=57 shown=3/3"}
+{"t": 1792321122208, "event": "kwin", "message": "added 1792321122208 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321122208, "event": "kwin", "message": "added 1792321122208 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321122222, "event": "kwin", "message": "added 1792321122222 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321122841, "event": "shift-down"}
+{"t": 1792321122941, "event": "button-down"}
+{"t": 1792321122941, "event": "daemon", "message": "press-at 3021,501"}
+{"t": 1792321123441, "event": "release"}
+{"t": 1792321123442, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=4 input_p95_ms=5 frame_samples=98 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=7 magnifier=1"}
+{"t": 1792321123443, "event": "kwin", "message": "removed 1792321123443 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321123443, "event": "kwin", "message": "removed 1792321123443 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321123444, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792321123454, "event": "daemon", "message": "clipboard-offer-direct rect=3021,501 450x250 native=450x250 release_ms=1300 copy_and_offer_ms=13"}
+{"t": 1792321123454, "event": "kwin", "message": "removed 1792321123454 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321123455, "event": "probe-changed"}
+{"t": 1792321123460, "event": "probe-png-decoded", "message": "450x250"}
+{"t": 1792321124941, "event": "trial", "trial": 2}
+{"t": 1792321125341, "event": "press"}
+{"t": 1792321125342, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792321125342, "event": "daemon", "message": "capture-request mode=screens"}
+{"t": 1792321125363, "event": "daemon", "message": "capture-part HDMI-A-5 reply_ms=16 data_ms=20 image=2560x1440 format=6"}
+{"t": 1792321125363, "event": "daemon", "message": "overlay-shown HDMI-A-5 ms=20 shown=1/3"}
+{"t": 1792321125370, "event": "daemon", "message": "capture-part DP-4 reply_ms=26 data_ms=27 image=1920x1080 format=6"}
+{"t": 1792321125370, "event": "daemon", "message": "overlay-shown DP-4 ms=27 shown=2/3"}
+{"t": 1792321125396, "event": "daemon", "message": "capture-part DP-5 reply_ms=47 data_ms=53 image=3440x1440 format=6"}
+{"t": 1792321125396, "event": "daemon", "message": "overlay-shown DP-5 ms=53 shown=3/3"}
+{"t": 1792321125403, "event": "kwin", "message": "added 1792321125403 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321125403, "event": "kwin", "message": "added 1792321125403 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321125413, "event": "kwin", "message": "added 1792321125413 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321126042, "event": "shift-down"}
+{"t": 1792321126142, "event": "button-down"}
+{"t": 1792321126142, "event": "daemon", "message": "press-at 3041,501"}
+{"t": 1792321126642, "event": "release"}
+{"t": 1792321126644, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=4 input_p95_ms=5 frame_samples=99 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=5 magnifier=1"}
+{"t": 1792321126646, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792321126646, "event": "daemon", "message": "clipboard-offer-direct rect=3041,501 500x250 native=500x250 release_ms=1301 copy_and_offer_ms=3"}
+{"t": 1792321126647, "event": "kwin", "message": "removed 1792321126647 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321126647, "event": "kwin", "message": "removed 1792321126647 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321126647, "event": "kwin", "message": "removed 1792321126647 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321126647, "event": "probe-changed"}
+{"t": 1792321126651, "event": "probe-png-decoded", "message": "500x250"}
+{"t": 1792321128143, "event": "trial", "trial": 3}
+{"t": 1792321128543, "event": "press"}
+{"t": 1792321128544, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792321128544, "event": "daemon", "message": "capture-request mode=screens"}
+{"t": 1792321128566, "event": "daemon", "message": "capture-part HDMI-A-5 reply_ms=16 data_ms=22 image=2560x1440 format=6"}
+{"t": 1792321128566, "event": "daemon", "message": "overlay-shown HDMI-A-5 ms=22 shown=1/3"}
+{"t": 1792321128573, "event": "daemon", "message": "capture-part DP-4 reply_ms=27 data_ms=28 image=1920x1080 format=6"}
+{"t": 1792321128573, "event": "daemon", "message": "overlay-shown DP-4 ms=28 shown=2/3"}
+{"t": 1792321128596, "event": "daemon", "message": "capture-part DP-5 reply_ms=47 data_ms=52 image=3440x1440 format=6"}
+{"t": 1792321128596, "event": "daemon", "message": "overlay-shown DP-5 ms=52 shown=3/3"}
+{"t": 1792321128601, "event": "kwin", "message": "added 1792321128601 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321128602, "event": "kwin", "message": "added 1792321128602 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321128612, "event": "kwin", "message": "added 1792321128612 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321129243, "event": "shift-down"}
+{"t": 1792321129344, "event": "button-down"}
+{"t": 1792321129344, "event": "daemon", "message": "press-at 3061,501"}
+{"t": 1792321129844, "event": "release"}
+{"t": 1792321129845, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=4 input_p95_ms=5 frame_samples=99 frame_median_ms=5 frame_p95_ms=5 frame_max_ms=5 magnifier=1"}
+{"t": 1792321129849, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792321129849, "event": "daemon", "message": "clipboard-offer-direct rect=3061,501 550x250 native=550x250 release_ms=1301 copy_and_offer_ms=4"}
+{"t": 1792321129850, "event": "kwin", "message": "removed 1792321129850 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321129850, "event": "kwin", "message": "removed 1792321129850 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321129850, "event": "kwin", "message": "removed 1792321129850 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321129850, "event": "probe-changed"}
+{"t": 1792321129854, "event": "probe-png-decoded", "message": "550x250"}
+{"t": 1792321131344, "event": "trial", "trial": 4}
+{"t": 1792321131745, "event": "press"}
+{"t": 1792321131746, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792321131746, "event": "daemon", "message": "capture-request mode=screens"}
+{"t": 1792321131767, "event": "daemon", "message": "capture-part HDMI-A-5 reply_ms=16 data_ms=21 image=2560x1440 format=6"}
+{"t": 1792321131767, "event": "daemon", "message": "overlay-shown HDMI-A-5 ms=21 shown=1/3"}
+{"t": 1792321131775, "event": "daemon", "message": "capture-part DP-4 reply_ms=27 data_ms=29 image=1920x1080 format=6"}
+{"t": 1792321131775, "event": "daemon", "message": "overlay-shown DP-4 ms=29 shown=2/3"}
+{"t": 1792321131800, "event": "daemon", "message": "capture-part DP-5 reply_ms=48 data_ms=53 image=3440x1440 format=6"}
+{"t": 1792321131800, "event": "daemon", "message": "overlay-shown DP-5 ms=54 shown=3/3"}
+{"t": 1792321131806, "event": "kwin", "message": "added 1792321131806 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321131806, "event": "kwin", "message": "added 1792321131806 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321131820, "event": "kwin", "message": "added 1792321131820 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321132445, "event": "shift-down"}
+{"t": 1792321132545, "event": "button-down"}
+{"t": 1792321132546, "event": "daemon", "message": "press-at 3081,501"}
+{"t": 1792321133046, "event": "release"}
+{"t": 1792321133046, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=4 input_p95_ms=5 frame_samples=99 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=5 magnifier=1"}
+{"t": 1792321133049, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792321133049, "event": "daemon", "message": "clipboard-offer-direct rect=3081,501 600x250 native=600x250 release_ms=1300 copy_and_offer_ms=3"}
+{"t": 1792321133050, "event": "kwin", "message": "removed 1792321133050 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321133050, "event": "kwin", "message": "removed 1792321133050 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321133050, "event": "kwin", "message": "removed 1792321133050 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321133051, "event": "probe-changed"}
+{"t": 1792321133054, "event": "probe-png-decoded", "message": "600x250"}
+{"t": 1792321134546, "event": "trial", "trial": 5}
+{"t": 1792321134946, "event": "press"}
+{"t": 1792321134947, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792321134947, "event": "daemon", "message": "capture-request mode=screens"}
+{"t": 1792321134968, "event": "daemon", "message": "capture-part HDMI-A-5 reply_ms=16 data_ms=21 image=2560x1440 format=6"}
+{"t": 1792321134968, "event": "daemon", "message": "overlay-shown HDMI-A-5 ms=21 shown=1/3"}
+{"t": 1792321134976, "event": "daemon", "message": "capture-part DP-4 reply_ms=27 data_ms=29 image=1920x1080 format=6"}
+{"t": 1792321134976, "event": "daemon", "message": "overlay-shown DP-4 ms=29 shown=2/3"}
+{"t": 1792321135001, "event": "daemon", "message": "capture-part DP-5 reply_ms=48 data_ms=54 image=3440x1440 format=6"}
+{"t": 1792321135001, "event": "daemon", "message": "overlay-shown DP-5 ms=54 shown=3/3"}
+{"t": 1792321135008, "event": "kwin", "message": "added 1792321135008 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321135010, "event": "kwin", "message": "added 1792321135010 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321135020, "event": "kwin", "message": "added 1792321135020 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321135647, "event": "shift-down"}
+{"t": 1792321135747, "event": "button-down"}
+{"t": 1792321135748, "event": "daemon", "message": "press-at 3101,501"}
+{"t": 1792321136247, "event": "release"}
+{"t": 1792321136248, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=4 input_p95_ms=5 frame_samples=99 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=6 magnifier=1"}
+{"t": 1792321136251, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792321136251, "event": "daemon", "message": "clipboard-offer-direct rect=3101,501 650x250 native=650x250 release_ms=1300 copy_and_offer_ms=3"}
+{"t": 1792321136251, "event": "kwin", "message": "removed 1792321136251 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792321136251, "event": "kwin", "message": "removed 1792321136251 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792321136252, "event": "kwin", "message": "removed 1792321136252 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792321136252, "event": "probe-changed"}
+{"t": 1792321136256, "event": "probe-png-decoded", "message": "650x250"}

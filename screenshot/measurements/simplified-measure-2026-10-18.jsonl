@@ -1,0 +1,110 @@
+{"t": 1792329435645, "event": "probe-changed"}
+{"t": 1792329435653, "event": "probe-png-decoded", "message": "360x1"}
+{"t": 1792329438050, "event": "trial", "trial": 1}
+{"t": 1792329438052, "event": "kwin", "message": "removed 1792329438052 plasma-visual-screensaver 2560,0 3440x1440"}
+{"t": 1792329438052, "event": "kwin", "message": "removed 1792329438052 plasma-visual-screensaver 0,0 2560x1440"}
+{"t": 1792329438052, "event": "kwin", "message": "removed 1792329438052 plasma-visual-screensaver 6000,195 1920x1080"}
+{"t": 1792329438450, "event": "press"}
+{"t": 1792329438451, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792329438451, "event": "daemon", "message": "capture-request"}
+{"t": 1792329438509, "event": "daemon", "message": "capture-complete reply_ms=40 ms=57 image=7920x1440 format=6 scale=1.000x1.000"}
+{"t": 1792329438509, "event": "daemon", "message": "overlay-shown ms=57 windows=3"}
+{"t": 1792329438531, "event": "kwin", "message": "added 1792329438531 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329438531, "event": "kwin", "message": "added 1792329438531 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329438531, "event": "kwin", "message": "added 1792329438531 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329439150, "event": "shift-down"}
+{"t": 1792329439250, "event": "button-down"}
+{"t": 1792329439251, "event": "daemon", "message": "press-at 3021,501"}
+{"t": 1792329439751, "event": "release"}
+{"t": 1792329439751, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=5 input_p95_ms=5 frame_samples=99 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=5 magnifier=1"}
+{"t": 1792329439755, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792329439764, "event": "daemon", "message": "clipboard-offer-direct rect=3021,501 450x250 native=450x250 release_ms=1300 copy_and_offer_ms=12"}
+{"t": 1792329439764, "event": "kwin", "message": "removed 1792329439764 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329439764, "event": "kwin", "message": "removed 1792329439764 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329439764, "event": "kwin", "message": "removed 1792329439764 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329439765, "event": "probe-changed"}
+{"t": 1792329439769, "event": "probe-png-decoded", "message": "450x250"}
+{"t": 1792329441251, "event": "trial", "trial": 2}
+{"t": 1792329441651, "event": "press"}
+{"t": 1792329441652, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792329441652, "event": "daemon", "message": "capture-request"}
+{"t": 1792329441706, "event": "daemon", "message": "capture-complete reply_ms=41 ms=53 image=7920x1440 format=6 scale=1.000x1.000"}
+{"t": 1792329441706, "event": "daemon", "message": "overlay-shown ms=53 windows=3"}
+{"t": 1792329441715, "event": "kwin", "message": "added 1792329441715 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329441716, "event": "kwin", "message": "added 1792329441716 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329441716, "event": "kwin", "message": "added 1792329441716 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329442352, "event": "shift-down"}
+{"t": 1792329442452, "event": "button-down"}
+{"t": 1792329442453, "event": "daemon", "message": "press-at 3041,501"}
+{"t": 1792329442952, "event": "release"}
+{"t": 1792329442953, "event": "daemon", "message": "drag-stats input_samples=98 input_median_ms=4 input_p95_ms=5 frame_samples=99 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=6 magnifier=1"}
+{"t": 1792329442958, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792329442958, "event": "daemon", "message": "clipboard-offer-direct rect=3041,501 500x250 native=500x250 release_ms=1301 copy_and_offer_ms=5"}
+{"t": 1792329442958, "event": "kwin", "message": "removed 1792329442958 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329442959, "event": "kwin", "message": "removed 1792329442959 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329442959, "event": "kwin", "message": "removed 1792329442959 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329442959, "event": "probe-changed"}
+{"t": 1792329442964, "event": "probe-png-decoded", "message": "500x250"}
+{"t": 1792329444452, "event": "trial", "trial": 3}
+{"t": 1792329444853, "event": "press"}
+{"t": 1792329444853, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792329444853, "event": "daemon", "message": "capture-request"}
+{"t": 1792329444905, "event": "daemon", "message": "capture-complete reply_ms=41 ms=51 image=7920x1440 format=6 scale=1.000x1.000"}
+{"t": 1792329444905, "event": "daemon", "message": "overlay-shown ms=52 windows=3"}
+{"t": 1792329444915, "event": "kwin", "message": "added 1792329444915 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329444922, "event": "kwin", "message": "added 1792329444922 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329444922, "event": "kwin", "message": "added 1792329444922 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329445553, "event": "shift-down"}
+{"t": 1792329445653, "event": "button-down"}
+{"t": 1792329445654, "event": "daemon", "message": "press-at 3061,501"}
+{"t": 1792329446154, "event": "release"}
+{"t": 1792329446154, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=4 input_p95_ms=5 frame_samples=99 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=5 magnifier=1"}
+{"t": 1792329446155, "event": "kwin", "message": "removed 1792329446155 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329446155, "event": "kwin", "message": "removed 1792329446155 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329446155, "event": "kwin", "message": "removed 1792329446155 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329446159, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792329446160, "event": "daemon", "message": "clipboard-offer-direct rect=3061,501 550x250 native=550x250 release_ms=1300 copy_and_offer_ms=6"}
+{"t": 1792329446160, "event": "probe-changed"}
+{"t": 1792329446163, "event": "probe-png-decoded", "message": "550x250"}
+{"t": 1792329447654, "event": "trial", "trial": 4}
+{"t": 1792329448054, "event": "press"}
+{"t": 1792329448055, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792329448055, "event": "daemon", "message": "capture-request"}
+{"t": 1792329448108, "event": "daemon", "message": "capture-complete reply_ms=41 ms=52 image=7920x1440 format=6 scale=1.000x1.000"}
+{"t": 1792329448108, "event": "daemon", "message": "overlay-shown ms=52 windows=3"}
+{"t": 1792329448118, "event": "kwin", "message": "added 1792329448118 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329448119, "event": "kwin", "message": "added 1792329448119 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329448125, "event": "kwin", "message": "added 1792329448125 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329448754, "event": "shift-down"}
+{"t": 1792329448855, "event": "button-down"}
+{"t": 1792329448855, "event": "daemon", "message": "press-at 3081,501"}
+{"t": 1792329449355, "event": "release"}
+{"t": 1792329449356, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=4 input_p95_ms=5 frame_samples=99 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=5 magnifier=1"}
+{"t": 1792329449360, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792329449360, "event": "daemon", "message": "clipboard-offer-direct rect=3081,501 600x250 native=600x250 release_ms=1300 copy_and_offer_ms=5"}
+{"t": 1792329449360, "event": "kwin", "message": "removed 1792329449360 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329449360, "event": "kwin", "message": "removed 1792329449360 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329449360, "event": "kwin", "message": "removed 1792329449360 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329449361, "event": "probe-changed"}
+{"t": 1792329449365, "event": "probe-png-decoded", "message": "600x250"}
+{"t": 1792329450855, "event": "trial", "trial": 5}
+{"t": 1792329451256, "event": "press"}
+{"t": 1792329451257, "event": "daemon", "message": "shortcut-pressed"}
+{"t": 1792329451257, "event": "daemon", "message": "capture-request"}
+{"t": 1792329451311, "event": "daemon", "message": "capture-complete reply_ms=42 ms=54 image=7920x1440 format=6 scale=1.000x1.000"}
+{"t": 1792329451312, "event": "daemon", "message": "overlay-shown ms=55 windows=3"}
+{"t": 1792329451324, "event": "kwin", "message": "added 1792329451324 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329451324, "event": "kwin", "message": "added 1792329451324 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329451324, "event": "kwin", "message": "added 1792329451324 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329451957, "event": "shift-down"}
+{"t": 1792329452057, "event": "button-down"}
+{"t": 1792329452058, "event": "daemon", "message": "press-at 3101,501"}
+{"t": 1792329452558, "event": "release"}
+{"t": 1792329452558, "event": "daemon", "message": "drag-stats input_samples=99 input_median_ms=4 input_p95_ms=5 frame_samples=99 frame_median_ms=4 frame_p95_ms=5 frame_max_ms=5 magnifier=1"}
+{"t": 1792329452563, "event": "daemon", "message": "overlay-closed"}
+{"t": 1792329452563, "event": "daemon", "message": "clipboard-offer-direct rect=3101,501 650x250 native=650x250 release_ms=1301 copy_and_offer_ms=5"}
+{"t": 1792329452564, "event": "kwin", "message": "removed 1792329452564 quick-region-overlay 0,0 2560x1440"}
+{"t": 1792329452564, "event": "kwin", "message": "removed 1792329452564 quick-region-overlay 6000,195 1920x1080"}
+{"t": 1792329452564, "event": "kwin", "message": "removed 1792329452564 quick-region-overlay 2560,0 3440x1440"}
+{"t": 1792329452565, "event": "probe-changed"}
+{"t": 1792329452569, "event": "probe-png-decoded", "message": "650x250"}

@@ -1,0 +1,88 @@
+{"t": 1792170334.7093344, "event": "uinput", "pid": 2531587}
+{"t": 1792170334.7342045, "event": "native_clipboard_changed"}
+{"t": 1792170334.750318, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792170335.2253492, "event": "launch", "trial": 1}
+{"t": 1792170335.5185013, "event": "mapped:org.kde.spectacle:2560x1440", "kwin_ms": 1792170335518.0}
+{"t": 1792170335.5222971, "event": "native_clipboard_changed"}
+{"t": 1792170335.5224426, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792170335.621001, "event": "mapped:org.kde.spectacle:1920x1080", "kwin_ms": 1792170335621.0}
+{"t": 1792170335.6894355, "event": "service", "journal_t": 1792170335.260125, "message": "1792170335260 capture-request"}
+{"t": 1792170335.6895313, "event": "service", "journal_t": 1792170335.260403, "message": "1792170335260 capture-dispatched warm"}
+{"t": 1792170335.705057, "event": "mapped:org.kde.spectacle:3440x1440", "kwin_ms": 1792170335705.0}
+{"t": 1792170337.1063957, "event": "press"}
+{"t": 1792170337.6275046, "event": "release"}
+{"t": 1792170337.629082, "event": "removed:org.kde.spectacle:2560x1440", "kwin_ms": 1792170337629.0}
+{"t": 1792170337.6295798, "event": "removed:org.kde.spectacle:1920x1080", "kwin_ms": 1792170337629.0}
+{"t": 1792170337.6298583, "event": "removed:org.kde.spectacle:3440x1440", "kwin_ms": 1792170337630.0}
+{"t": 1792170337.6300187, "event": "native_clipboard_changed"}
+{"t": 1792170337.6301312, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792170337.6334507, "event": "file", "mask": "0x100"}
+{"t": 1792170337.6371033, "event": "file", "mask": "0x8"}
+{"t": 1792170337.6389995, "event": "file", "mask": "0x200"}
+{"t": 1792170337.654796, "event": "native_clipboard_changed"}
+{"t": 1792170337.659654, "event": "native_image_received", "width": 451, "height": 241}
+{"t": 1792170337.9393861, "event": "service", "journal_t": 1792170337.653257, "message": "1792170337653 clipboard-set png_bytes=1112"}
+{"t": 1792170337.9394615, "event": "service", "journal_t": 1792170337.653257, "message": "1792170337653 clipboard-offer 451x241 png_bytes=1112"}
+{"t": 1792170337.9394896, "event": "service", "journal_t": 1792170337.800618, "message": "1792170337801 spectacle-exit code=0"}
+{"t": 1792170337.9395134, "event": "service", "journal_t": 1792170337.809472, "message": "1792170337809 spectacle-start pid=2531904 mode=idle-dbus"}
+{"t": 1792170338.1893733, "event": "service", "journal_t": 1792170338.073524, "message": "spectacle: Attempting to use Tesseract library \"libtesseract.so.5\""}
+{"t": 1792170338.1894467, "event": "service", "journal_t": 1792170338.073524, "message": "spectacle: Detected Tesseract version \"5.5.0\""}
+{"t": 1792170338.1894705, "event": "service", "journal_t": 1792170338.073524, "message": "spectacle: Loaded Tesseract runtime library from \"libtesseract.so.5\""}
+{"t": 1792170338.4054112, "event": "escape"}
+{"t": 1792170339.4053411, "event": "launch", "trial": 2}
+{"t": 1792170339.6891782, "event": "service", "journal_t": 1792170339.43966, "message": "1792170339440 capture-request"}
+{"t": 1792170339.6892524, "event": "service", "journal_t": 1792170339.439941, "message": "1792170339440 capture-dispatched warm"}
+{"t": 1792170339.7038398, "event": "mapped:org.kde.spectacle:2560x1440", "kwin_ms": 1792170339704.0}
+{"t": 1792170339.7068167, "event": "native_clipboard_changed"}
+{"t": 1792170339.706923, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792170339.7842422, "event": "mapped:org.kde.spectacle:1920x1080", "kwin_ms": 1792170339784.0}
+{"t": 1792170339.8582435, "event": "mapped:org.kde.spectacle:3440x1440", "kwin_ms": 1792170339858.0}
+{"t": 1792170340.9055207, "event": "press"}
+{"t": 1792170341.4262173, "event": "release"}
+{"t": 1792170341.437296, "event": "file", "mask": "0x100"}
+{"t": 1792170341.441527, "event": "file", "mask": "0x8"}
+{"t": 1792170341.4422054, "event": "removed:org.kde.spectacle:2560x1440", "kwin_ms": 1792170341442.0}
+{"t": 1792170341.4423208, "event": "removed:org.kde.spectacle:1920x1080", "kwin_ms": 1792170341442.0}
+{"t": 1792170341.442539, "event": "removed:org.kde.spectacle:3440x1440", "kwin_ms": 1792170341442.0}
+{"t": 1792170341.4426377, "event": "file", "mask": "0x200"}
+{"t": 1792170341.4435704, "event": "native_clipboard_changed"}
+{"t": 1792170341.44474, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792170341.4447958, "event": "native_clipboard_changed"}
+{"t": 1792170341.4493, "event": "native_image_received", "width": 501, "height": 241}
+{"t": 1792170341.5208404, "event": "service", "journal_t": 1792170341.44277, "message": "1792170341443 clipboard-set png_bytes=1175"}
+{"t": 1792170341.5209198, "event": "service", "journal_t": 1792170341.44277, "message": "1792170341443 clipboard-offer 501x241 png_bytes=1175"}
+{"t": 1792170341.697977, "event": "service", "journal_t": 1792170341.666927, "message": "1792170341667 spectacle-exit code=0"}
+{"t": 1792170341.6980503, "event": "service", "journal_t": 1792170341.697744, "message": "1792170341698 spectacle-start pid=2532165 mode=idle-dbus"}
+{"t": 1792170342.189313, "event": "service", "journal_t": 1792170341.973915, "message": "spectacle: Attempting to use Tesseract library \"libtesseract.so.5\""}
+{"t": 1792170342.1893904, "event": "service", "journal_t": 1792170341.973915, "message": "spectacle: Detected Tesseract version \"5.5.0\""}
+{"t": 1792170342.189416, "event": "service", "journal_t": 1792170341.973915, "message": "spectacle: Loaded Tesseract runtime library from \"libtesseract.so.5\""}
+{"t": 1792170342.4053457, "event": "escape"}
+{"t": 1792170342.9052665, "event": "launch", "trial": 3}
+{"t": 1792170343.1892202, "event": "service", "journal_t": 1792170342.947094, "message": "1792170342947 capture-request"}
+{"t": 1792170343.1893215, "event": "service", "journal_t": 1792170342.947467, "message": "1792170342947 capture-dispatched warm"}
+{"t": 1792170343.3293931, "event": "mapped:org.kde.spectacle:2560x1440", "kwin_ms": 1792170343329.0}
+{"t": 1792170343.3316557, "event": "native_clipboard_changed"}
+{"t": 1792170343.3317435, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792170343.4201093, "event": "mapped:org.kde.spectacle:1920x1080", "kwin_ms": 1792170343420.0}
+{"t": 1792170343.4978845, "event": "mapped:org.kde.spectacle:3440x1440", "kwin_ms": 1792170343498.0}
+{"t": 1792170344.906115, "event": "press"}
+{"t": 1792170345.4274068, "event": "release"}
+{"t": 1792170345.4303198, "event": "removed:org.kde.spectacle:2560x1440", "kwin_ms": 1792170345430.0}
+{"t": 1792170345.4310648, "event": "removed:org.kde.spectacle:1920x1080", "kwin_ms": 1792170345431.0}
+{"t": 1792170345.4312363, "event": "removed:org.kde.spectacle:3440x1440", "kwin_ms": 1792170345431.0}
+{"t": 1792170345.431391, "event": "native_clipboard_changed"}
+{"t": 1792170345.4365282, "event": "native_image_received", "width": 501, "height": 241}
+{"t": 1792170345.4374669, "event": "file", "mask": "0x100"}
+{"t": 1792170345.4375088, "event": "file", "mask": "0x8"}
+{"t": 1792170345.4375162, "event": "file", "mask": "0x200"}
+{"t": 1792170345.4375417, "event": "native_clipboard_changed"}
+{"t": 1792170345.4438748, "event": "native_image_received", "width": 551, "height": 241}
+{"t": 1792170345.69035, "event": "service", "journal_t": 1792170345.436848, "message": "1792170345437 clipboard-set png_bytes=1265"}
+{"t": 1792170345.690616, "event": "service", "journal_t": 1792170345.436848, "message": "1792170345437 clipboard-offer 551x241 png_bytes=1265"}
+{"t": 1792170345.6906989, "event": "service", "journal_t": 1792170345.565761, "message": "1792170345566 spectacle-exit code=0"}
+{"t": 1792170345.6907742, "event": "service", "journal_t": 1792170345.57548, "message": "1792170345575 spectacle-start pid=2532339 mode=idle-dbus"}
+{"t": 1792170345.905209, "event": "escape"}
+{"t": 1792170346.1892645, "event": "service", "journal_t": 1792170345.811864, "message": "spectacle: Attempting to use Tesseract library \"libtesseract.so.5\""}
+{"t": 1792170346.1893423, "event": "service", "journal_t": 1792170345.811864, "message": "spectacle: Detected Tesseract version \"5.5.0\""}
+{"t": 1792170346.1893692, "event": "service", "journal_t": 1792170345.811864, "message": "spectacle: Loaded Tesseract runtime library from \"libtesseract.so.5\""}
+{"t": 1792170347.9064882, "event": "escape"}

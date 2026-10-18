@@ -1,0 +1,64 @@
+{"t": 1792169908.5785573, "event": "uinput", "pid": 2494130}
+{"t": 1792169908.6404812, "event": "native_clipboard_changed"}
+{"t": 1792169908.6707637, "event": "native_image_received", "width": 401, "height": 241}
+{"t": 1792169909.1197846, "event": "launch", "trial": 1}
+{"t": 1792169910.2424178, "event": "mapped:org.kde.spectacle:2560x1440", "kwin_ms": 1792169910239.0}
+{"t": 1792169910.2466223, "event": "native_clipboard_changed"}
+{"t": 1792169910.246772, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792169910.2728705, "event": "mapped:org.kde.spectacle:1920x1080", "kwin_ms": 1792169910271.0}
+{"t": 1792169910.327015, "event": "mapped:org.kde.spectacle:3440x1440", "kwin_ms": 1792169910327.0}
+{"t": 1792169910.9129858, "event": "press"}
+{"t": 1792169911.4368055, "event": "release"}
+{"t": 1792169911.4743614, "event": "removed:org.kde.spectacle:2560x1440", "kwin_ms": 1792169911473.0}
+{"t": 1792169911.474471, "event": "removed:org.kde.spectacle:1920x1080", "kwin_ms": 1792169911473.0}
+{"t": 1792169911.4744897, "event": "removed:org.kde.spectacle:3440x1440", "kwin_ms": 1792169911474.0}
+{"t": 1792169911.474547, "event": "file", "mask": "0x100"}
+{"t": 1792169911.47639, "event": "native_clipboard_changed"}
+{"t": 1792169911.5080345, "event": "native_image_received", "width": 401, "height": 241}
+{"t": 1792169911.5094616, "event": "file", "mask": "0x8"}
+{"t": 1792169911.606469, "event": "file", "mask": "0x200"}
+{"t": 1792169911.611148, "event": "native_clipboard_changed"}
+{"t": 1792169911.6166162, "event": "native_image_received", "width": 401, "height": 241}
+{"t": 1792169911.939243, "event": "service", "journal_t": 1792169911.606497, "message": "copied capture: 401x241 owns_clipboard=True"}
+{"t": 1792169912.3053427, "event": "escape"}
+{"t": 1792169912.9050806, "event": "launch", "trial": 2}
+{"t": 1792169913.9611835, "event": "mapped:org.kde.spectacle:2560x1440", "kwin_ms": 1792169913961.0}
+{"t": 1792169913.9646509, "event": "native_clipboard_changed"}
+{"t": 1792169913.9647794, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792169913.9874775, "event": "mapped:org.kde.spectacle:1920x1080", "kwin_ms": 1792169913987.0}
+{"t": 1792169914.0570285, "event": "mapped:org.kde.spectacle:3440x1440", "kwin_ms": 1792169914057.0}
+{"t": 1792169914.9053993, "event": "press"}
+{"t": 1792169915.4270816, "event": "release"}
+{"t": 1792169915.4336555, "event": "file", "mask": "0x100"}
+{"t": 1792169915.4371805, "event": "file", "mask": "0x8"}
+{"t": 1792169915.4546957, "event": "removed:org.kde.spectacle:2560x1440", "kwin_ms": 1792169915454.0}
+{"t": 1792169915.4550486, "event": "removed:org.kde.spectacle:1920x1080", "kwin_ms": 1792169915455.0}
+{"t": 1792169915.4552426, "event": "removed:org.kde.spectacle:3440x1440", "kwin_ms": 1792169915455.0}
+{"t": 1792169915.4576385, "event": "native_clipboard_changed"}
+{"t": 1792169915.4630048, "event": "native_image_received", "width": 401, "height": 241}
+{"t": 1792169915.6055367, "event": "file", "mask": "0x200"}
+{"t": 1792169915.6093926, "event": "native_clipboard_changed"}
+{"t": 1792169915.6140206, "event": "native_image_received", "width": 401, "height": 241}
+{"t": 1792169915.9392374, "event": "service", "journal_t": 1792169915.607393, "message": "copied capture: 401x241 owns_clipboard=True"}
+{"t": 1792169916.3054993, "event": "escape"}
+{"t": 1792169916.905335, "event": "launch", "trial": 3}
+{"t": 1792169917.8878474, "event": "mapped:org.kde.spectacle:2560x1440", "kwin_ms": 1792169917888.0}
+{"t": 1792169917.892243, "event": "native_clipboard_changed"}
+{"t": 1792169917.8923702, "event": "native_image_received", "width": 0, "height": 0}
+{"t": 1792169917.922583, "event": "mapped:org.kde.spectacle:1920x1080", "kwin_ms": 1792169917920.0}
+{"t": 1792169917.994921, "event": "mapped:org.kde.spectacle:3440x1440", "kwin_ms": 1792169917995.0}
+{"t": 1792169918.9056969, "event": "press"}
+{"t": 1792169919.427354, "event": "release"}
+{"t": 1792169919.4375777, "event": "removed:org.kde.spectacle:2560x1440", "kwin_ms": 1792169919437.0}
+{"t": 1792169919.4398084, "event": "removed:org.kde.spectacle:1920x1080", "kwin_ms": 1792169919439.0}
+{"t": 1792169919.4402704, "event": "removed:org.kde.spectacle:3440x1440", "kwin_ms": 1792169919440.0}
+{"t": 1792169919.4406497, "event": "native_clipboard_changed"}
+{"t": 1792169919.4469476, "event": "native_image_received", "width": 401, "height": 241}
+{"t": 1792169919.4480577, "event": "file", "mask": "0x100"}
+{"t": 1792169919.4481332, "event": "file", "mask": "0x8"}
+{"t": 1792169919.6059456, "event": "file", "mask": "0x200"}
+{"t": 1792169919.6120162, "event": "native_clipboard_changed"}
+{"t": 1792169919.6195807, "event": "native_image_received", "width": 401, "height": 241}
+{"t": 1792169919.905035, "event": "escape"}
+{"t": 1792169919.9391518, "event": "service", "journal_t": 1792169919.606273, "message": "copied capture: 401x241 owns_clipboard=True"}
+{"t": 1792169921.9082701, "event": "escape"}

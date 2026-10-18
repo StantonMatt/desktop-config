@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-18",
+  "system": "Plasma/KWin 6.6.6 Wayland, Qt 6.10.2, NVIDIA RTX 4090, scale 1: HDMI-A-5 2560x1440@100, DP-5 3440x1440@175, DP-4 1920x1080@240",
+  "method": "Real Meta+Shift+S through KGlobalAccel, injected with uinput (keyboard plus absolute pointer that has a middle button, so libinput middle-button emulation does not delay presses). Overlay mapping = KWin script workspace.windowAdded Date.now(). Drag = 100 absolute pointer moves over 500 ms on DP-5 with Shift held (magnifier visible); frame intervals are the daemon's paint-event intervals on the output under the pointer. Readable = a resident native Wayland Qt client using KSystemClipboard (ext-data-control) got the change signal, requested image/png and decoded it.",
+  "region": "Overlay 450/500/550x250; Spectacle control 334x178. Same-session control used rollback.sh (Spectacle-based fast version), then install.sh.",
+  "overlay": [
+    {
+      "trial": 1,
+      "press_first_overlay_ms": 121,
+      "press_all_overlays_ms": 121,
+      "release_native_png_decoded_ms": 8,
+      "dbus_capture_request_to_frozen_image_ms": 78,
+      "drag_frame_median_ms": 4,
+      "drag_frame_p95_ms": 5,
+      "drag_frame_max_ms": 5,
+      "drag_frame_samples": 99,
+      "magnifier": true
+    },
+    {
+      "trial": 2,
+      "press_first_overlay_ms": 112,
+      "press_all_overlays_ms": 128,
+      "release_native_png_decoded_ms": 9,
+      "dbus_capture_request_to_frozen_image_ms": 81,
+      "drag_frame_median_ms": 4,
+      "drag_frame_p95_ms": 5,
+      "drag_frame_max_ms": 6,
+      "drag_frame_samples": 99,
+      "magnifier": true
+    },
+    {
+      "trial": 3,
+      "press_first_overlay_ms": 127,
+      "press_all_overlays_ms": 127,
+      "release_native_png_decoded_ms": 10,
+      "dbus_capture_request_to_frozen_image_ms": 79,
+      "drag_frame_median_ms": 5,
+      "drag_frame_p95_ms": 5,
+      "drag_frame_max_ms": 5,
+      "drag_frame_samples": 99,
+      "magnifier": true
+    }
+  ],
+  "overlay_median": {
+    "press_first_overlay_ms": 121,
+    "press_all_overlays_ms": 127,
+    "release_native_png_decoded_ms": 9,
+    "dbus_capture_request_to_frozen_image_ms": 79,
+    "drag_frame_median_ms": 4,
+    "drag_frame_p95_ms": 5,
+    "drag_frame_max_ms": 5,
+    "drag_frame_samples": 99
+  },
+  "spectacle_control": [
+    {
+      "trial": 1,
+      "press_first_overlay_ms": 404,
+      "press_all_overlays_ms": 575,
+      "release_native_png_decoded_ms": 18
+    },
+    {
+      "trial": 2,
+      "press_first_overlay_ms": 335,
+      "press_all_overlays_ms": 503,
+      "release_native_png_decoded_ms": 22
+    },
+    {
+      "trial": 3,
+      "press_first_overlay_ms": 332,
+      "press_all_overlays_ms": 512,
+      "release_native_png_decoded_ms": 22
+    }
+  ],
+  "spectacle_control_median": {
+    "press_first_overlay_ms": 335,
+    "press_all_overlays_ms": 512,
+    "release_native_png_decoded_ms": 22
+  }
+}
