@@ -1,5 +1,5 @@
 #!/bin/bash
-# Replace the overlay daemon with a backed-up Spectacle pipeline. Other shortcuts and Spectacle settings are untouched.
+# Remove a fresh-installed overlay daemon, or restore a backed-up legacy Spectacle pipeline. Other shortcuts and Spectacle settings are untouched.
 #   rollback.sh              Spectacle-based fast version (resident service + idle Spectacle), 2026-10-18 backup
 #   rollback.sh --originals  original kioclient/Spectacle + Python clipboard scripts, 2026-10-16 backup
 set -euo pipefail
@@ -14,43 +14,55 @@ state_dir="$HOME/.local/state/quick-region-overlay"
 state_file="$state_dir/handover"
 mode_file="$state_dir/previous-mode"
 manifest_file="$state_dir/manifest"
+fresh_file="$state_dir/fresh-spectacle-keys"
 recover=
 trap on_exit EXIT
 
 # 1. Prechecks. Restores and removals are allowed only for files matching an immutable backup.
-need_tools qdbus6 busctl jq kbuildsycoca6 systemctl systemd-run cmp flock
+need_tools qdbus6 busctl jq kbuildsycoca6 spectacle systemctl systemd-run cmp perl flock sha256sum awk sed install stat paste date cat mkdir cp mv rm dirname sleep grep
 take_lock
-check_backup "$mode"
+fresh=0
+if [[ -e $fresh_file || -L $fresh_file ]]; then
+    [[ $# == 0 ]] || fail 'A fresh install rolls back to stock Spectacle; use ./rollback.sh without --originals.'
+    load_fresh_keys
+    fresh=1
+else
+    check_backup "$mode"
+fi
 check_key_owner "$meta_shift_s_code" "$daemon_owner" "$launcher_owner" org.kde.spectacle.desktop/_launch
 check_key_owner "$print_code" "$daemon_owner" org.kde.spectacle.desktop/_launch
-launcher_mode >/dev/null
-if [[ -e "$spectacle_override_entry" ]]; then
-    cmp -s -- "$backup/$spectacle_override_relative" "$spectacle_override_entry" ||
-        fail "$spectacle_override_entry was edited; nothing was changed."
+if [[ $fresh == 0 ]]; then
+    launcher_mode >/dev/null
+    if [[ -e "$spectacle_override_entry" ]]; then
+        cmp -s -- "$backup/$spectacle_override_relative" "$spectacle_override_entry" ||
+            fail "$spectacle_override_entry was edited; nothing was changed."
+    fi
+    while read -r relative; do
+        [[ $relative == "$launcher_relative" ]] && continue
+        check_owned_file "$HOME/$relative" "$relative"
+    done < <(backup_files "$mode")
+    for relative in .local/libexec/quick-region-clipboard-service .local/libexec/quick-region-clipboard-service.py .local/libexec/quick-region-clipboard.py; do
+        check_owned_file "$HOME/$relative" "$relative"
+    done
 fi
-while read -r relative; do
-    [[ $relative == "$launcher_relative" ]] && continue
-    check_owned_file "$HOME/$relative" "$relative"
-done < <(backup_files "$mode")
-for relative in .local/libexec/quick-region-clipboard-service .local/libexec/quick-region-clipboard-service.py .local/libexec/quick-region-clipboard.py; do
-    check_owned_file "$HOME/$relative" "$relative"
-done
 recover=$(rollback_command "$mode")
 
-# 2. Restore the selected pipeline files and the Spectacle override. The cache is rebuilt before any shortcut handover.
-while read -r relative; do
-    [[ $relative == "$launcher_relative" ]] && continue
-    install -Dm"$(stat -c %a -- "$backup/$relative")" -- "$backup/$relative" "$HOME/$relative"
-done < <(backup_files "$mode")
-if [[ $mode == originals ]]; then
-    rm -f -- "$HOME/.local/libexec/quick-region-clipboard-service"
-else
-    rm -f -- "$HOME/.local/libexec/quick-region-clipboard-service.py" "$HOME/.local/libexec/quick-region-clipboard.py"
+if [[ $fresh == 0 ]]; then
+    # 2. Restore the selected pipeline files and the Spectacle override. The cache is rebuilt before any shortcut handover.
+    while read -r relative; do
+        [[ $relative == "$launcher_relative" ]] && continue
+        install -Dm"$(stat -c %a -- "$backup/$relative")" -- "$backup/$relative" "$HOME/$relative"
+    done < <(backup_files "$mode")
+    if [[ $mode == originals ]]; then
+        rm -f -- "$HOME/.local/libexec/quick-region-clipboard-service"
+    else
+        rm -f -- "$HOME/.local/libexec/quick-region-clipboard-service.py" "$HOME/.local/libexec/quick-region-clipboard.py"
+    fi
+    [[ -e "$spectacle_override_entry" ]] || note_relogin
+    install -Dm644 -- "$backup/$spectacle_override_relative" "$spectacle_override_entry"
+    rebuild_cache
+    fail_point after-service-files
 fi
-[[ -e "$spectacle_override_entry" ]] || note_relogin
-install -Dm644 -- "$backup/$spectacle_override_relative" "$spectacle_override_entry"
-rebuild_cache
-fail_point after-service-files
 
 # 3. Remove the overlay daemon. Any state but inactive or failed is stopped, which also catches a unit that is
 # activating or auto-restarting; a failed state is cleared so the removed unit doesn't linger.
@@ -70,6 +82,16 @@ rm -f -- "$HOME/.config/systemd/user/quick-region-overlay.service" \
 systemctl --user daemon-reload
 unregister_shortcut quick-region-overlay capture-region
 fail_point after-daemon-removed
+
+if [[ $fresh == 1 ]]; then
+    restore_fresh_keys
+    rebuild_cache
+    wait_for 30 fresh_keys_restored || fail "Spectacle's original keys changed after rebuilding the cache."
+    rm -f -- "$state_file" "$mode_file" "$manifest_file"
+    recover=
+    echo "Removed Quick Region Overlay; restored Spectacle's original shortcuts."
+    exit 0
+fi
 
 # 4. Restore the old launcher and its Meta+Shift+S binding. Set Spectacle's _launch to its existing keys minus
 # Meta+Shift+S, plus Print; this makes rollback deterministic while preserving the user's other Spectacle keys.

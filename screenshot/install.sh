@@ -9,18 +9,34 @@ state_dir="$HOME/.local/state/quick-region-overlay"
 state_file="$state_dir/handover"
 mode_file="$state_dir/previous-mode"
 manifest_file="$state_dir/manifest"
+fresh_file="$state_dir/fresh-spectacle-keys"
 recover=
 work=
 trap on_exit EXIT
 
-need_tools cmake c++ qdbus6 busctl jq kbuildsycoca6 systemctl systemd-run heavy cmp perl flock
+# Check dependencies before creating state or changing the desktop. The same complete command is printed for a
+# missing tool, header/CMake package or compiler; configure diagnostics remain visible.
+apt_line='sudo apt install git build-essential cmake qt6-base-dev qt6-wayland libkf6guiaddons-dev liblayershellqtinterface-dev libkf6globalaccel-dev qdbus-qt6 libkf6service-bin kde-spectacle jq coreutils gawk sed grep perl util-linux systemd dbus-user-session'
+missing_dependency() { printf '%s\n%s\n' "$1" "$apt_line" >&2; exit 1; }
+for tool in dpkg-query cmake c++ make qdbus6 busctl jq kbuildsycoca6 spectacle systemctl systemd-run cmp perl flock \
+    sha256sum awk sed install stat paste date cat mkdir mktemp cp mv rm dirname sleep grep; do
+    command -v "$tool" >/dev/null || missing_dependency "Missing tool: $tool. Install dependencies with:"
+done
+for package in qt6-base-dev qt6-wayland libkf6guiaddons-dev liblayershellqtinterface-dev libkf6globalaccel-dev; do
+    [[ $(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null) == installed ]] ||
+        missing_dependency "Missing dependency: $package. Install dependencies with:"
+done
 take_lock
 work=$(mkdir -p "$scratch" && mktemp -d "$scratch/overlay-install.XXXXXX")
-if [[ ! -f /usr/include/KF6/KGuiAddons/KSystemClipboard || ! -f /usr/include/LayerShellQt/window.h || ! -f /usr/include/KF6/KGlobalAccel/KGlobalAccel ]]; then
-    fail 'Missing dependency: sudo -n apt-get install --no-install-recommends libkf6guiaddons-dev liblayershellqtinterface-dev libkf6globalaccel-dev'
+cmake -S "$source_dir" -B "$work/cmake" -DCMAKE_BUILD_TYPE=Release >"$work/configure.log" 2>&1 || {
+    cat "$work/configure.log" >&2
+    missing_dependency "Could not configure the build. Install dependencies with:"
+}
+if command -v heavy >/dev/null; then
+    heavy cmake --build "$work/cmake" --parallel 2 --target quick-region-overlay
+else
+    cmake --build "$work/cmake" --parallel 2 --target quick-region-overlay
 fi
-cmake -S "$source_dir" -B "$work/cmake" -DCMAKE_BUILD_TYPE=Release >/dev/null
-heavy cmake --build "$work/cmake" --parallel 2 --target quick-region-overlay
 
 # 1. Prechecks. Every file that a forward-only step can delete is compared with an immutable backup first.
 previous=$(launcher_mode)
@@ -34,10 +50,20 @@ if marker_pending "$handover_state" && [[ -f $mode_file ]]; then
     valid_mode "$recorded_mode" || fail "$mode_file is invalid; remove it after checking the desktop state. Nothing was changed."
 fi
 rollback_mode=$(recovery_mode "$previous" "$handover_state" "$recorded_mode")
-check_backup "$rollback_mode"
+fresh=0
+record_fresh=0
+if [[ -e $fresh_file || -L $fresh_file ]]; then
+    load_fresh_keys
+    fresh=1
+fi
+if fresh_install_needed "$previous" "$handover_state"; then
+    fresh=1
+    record_fresh=1
+fi
+if [[ $fresh == 0 ]]; then check_backup "$rollback_mode"; fi
 [[ -f "$spectacle_fast_backup/$spectacle_override_relative" ]] || fail "The Spectacle override backup is missing; nothing was changed."
 check_override
-check_key_owner "$meta_shift_s_code" "$daemon_owner" "$launcher_owner"
+check_key_owner "$meta_shift_s_code" "$daemon_owner" "$launcher_owner" org.kde.spectacle.desktop/_launch
 check_key_owner "$print_code" "$daemon_owner" org.kde.spectacle.desktop/_launch
 for relative in \
     "$launcher_relative" .config/systemd/user/quick-region-clipboard.service .local/bin/quick-region-screenshot \
@@ -47,25 +73,19 @@ done
 [[ ! -e "$HOME/.local/share/applications/quick-region-overlay-proto.desktop" ]] ||
     fail "$HOME/.local/share/applications/quick-region-overlay-proto.desktop is not an owned old-pipeline file; nothing was changed."
 
+spectacle_meta=0
+checked action_has_key org.kde.spectacle.desktop _launch "$meta_shift_s_code" && spectacle_meta=1
 spectacle_print=0
 checked spectacle_owns_print && spectacle_print=1
 launcher_present=0
 [[ -n $previous ]] && launcher_present=1
-handover=$(handover_kind "$handover_state" "$launcher_present" "$spectacle_print")
+handover=$(handover_kind "$handover_state" "$launcher_present" "$spectacle_print" "$spectacle_meta")
 
-# 2. Save the old files before any one is removed. Existing backups are never overwritten.
-backup_file() {
-    local relative=$1
-    if [[ -e "$HOME/$relative" && ! -e "$spectacle_fast_backup/$relative" ]]; then
-        mkdir -p -- "$(dirname -- "$spectacle_fast_backup/$relative")"
-        cp -a -- "$HOME/$relative" "$spectacle_fast_backup/$relative"
-    fi
-}
-for relative in .config/kglobalshortcutsrc .config/spectaclerc "$launcher_relative" "$spectacle_override_relative" \
-    .config/systemd/user/quick-region-clipboard.service .local/bin/quick-region-screenshot \
-    .local/libexec/quick-region-clipboard-service .local/libexec/quick-region-clipboard-service.py .local/libexec/quick-region-clipboard.py; do
-    backup_file "$relative"
-done
+# 2. Record fresh Spectacle keys before the first desktop change. Archives in the repository are immutable.
+if [[ $record_fresh == 1 ]]; then
+    action_keys org.kde.spectacle.desktop _launch >"$fresh_file.tmp" || fail "Could not record Spectacle's original keys. Nothing was changed."
+    mv -- "$fresh_file.tmp" "$fresh_file"
+fi
 recover=$(rollback_command "$rollback_mode")
 # A recorded mode outlives its handover only after an interruption between the two writes that complete it.
 marker_pending "$handover_state" || rm -f -- "$mode_file"
@@ -103,9 +123,9 @@ if [[ -e "$spectacle_override_entry" ]]; then
     rebuild_cache
 fi
 
-# 4. Check the daemon, then hand over the keys its old owners still hold. Retiring the launcher resets the action once
-# so both defaults are acquired; Print taken from Spectacle is added to the action's current keys. See handover_kind.
-status=$(daemon_status) || fail 'The daemon did not answer; see journalctl --user -u quick-region-overlay.service'
+# 4. Check the daemon, then hand over the keys its old owners still hold. Taking Meta+Shift+S from the launcher or
+# Spectacle resets the action once so both defaults are acquired; Print taken from Spectacle is added to the action's current keys. See handover_kind.
+status=$(wait_daemon_status) || fail 'The daemon did not answer; see journalctl --user -u quick-region-overlay.service'
 [[ $status != error:* ]] || fail "The daemon could not read its shortcut from KGlobalAccel ($status)."
 fail_point after-daemon-start
 
@@ -128,12 +148,12 @@ if [[ -n $handover ]]; then
         systemctl --user stop quick-region-overlay.service
         unregister_shortcut quick-region-overlay capture-region
         restart_daemon
-        status=$(daemon_status) || fail 'The daemon did not answer after the handover; see journalctl --user -u quick-region-overlay.service'
+        status=$(wait_daemon_status) || fail 'The daemon did not answer after the handover; see journalctl --user -u quick-region-overlay.service'
     fi
     if handover_needs_print "$handover" "$status"; then
         add_daemon_print
         wait_for 30 daemon_has_print || fail 'The daemon did not get Print after Spectacle gave it up.'
-        status=$(daemon_status) || fail 'The daemon did not answer after the handover; see journalctl --user -u quick-region-overlay.service'
+        status=$(wait_daemon_status) || fail 'The daemon did not answer after the handover; see journalctl --user -u quick-region-overlay.service'
     fi
     handover_keys_present "$status" "$handover" || fail "The daemon did not get the required shortcuts after the handover ($status)."
     fail_point after-handover

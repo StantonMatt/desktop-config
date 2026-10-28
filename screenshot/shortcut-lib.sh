@@ -266,11 +266,10 @@ ensure_spectacle_action_print_removed() {
     wait_for 30 checked spectacle_defaults_removed ||
         fail "Spectacle's _launch action did not remove Print and Meta+Shift+S."
     stop_spectacle_action
-    sleep 0.6
     if ((${#keys[@]} == 0)); then
-        spectacle_config_empty || fail "Spectacle's _launch empty state was not written as _launch=none."
+        wait_for 30 spectacle_config_empty || fail "Spectacle's _launch empty state was not written as _launch=none."
     else
-        spectacle_config_no_print || fail "Spectacle's _launch keys without Print and Meta+Shift+S were not persisted."
+        wait_for 30 spectacle_config_no_print || fail "Spectacle's _launch keys without Print and Meta+Shift+S were not persisted."
     fi
 }
 
@@ -403,18 +402,18 @@ has_key() { [[ $1 == registered:* && "; ${1#registered:}; " == *"; $2; "* ]]; }
 has_default_key() { has_key "$1" 'Meta+Shift+S'; }
 
 # The handover marker in $state_dir/handover records what a run is taking from the old owners until the daemon has it:
-#   pending-meta       the launcher is being retired; the daemon needs Meta+Shift+S and is reset to its defaults without it
+#   pending-meta       Meta+Shift+S is being taken from the launcher or Spectacle; reset to defaults if it is missing
 #   pending-print      as pending-meta, and Print is being taken from Spectacle (earlier installs wrote it this way too)
 #   pending-print-add  only Print is being taken from Spectacle; it is added to the daemon's current keys, nothing reset
 #   complete           nothing is pending; absent means the same
 valid_marker() { [[ -z $1 || $1 == complete || $1 == pending-meta || $1 == pending-print || $1 == pending-print-add ]]; }
 marker_pending() { [[ $1 == pending-meta || $1 == pending-print || $1 == pending-print-add ]]; }
 # The handover this run must do, from the marker, whether the launcher is installed (0/1) and whether Spectacle holds
-# Print (0/1): one of the pending kinds, or nothing. Only retiring the launcher, now or in an interrupted run, can reset
-# the daemon's keys; Spectacle holding Print alone never does, so custom or cleared keys survive a rerun.
+# Print and Meta+Shift+S (0/1): one of the pending kinds, or nothing. Taking Meta+Shift+S from the launcher or Spectacle
+# can reset the daemon's keys; Spectacle holding Print alone never does, so custom or cleared keys survive a rerun.
 handover_kind() {
-    local marker=$1 launcher=$2 spectacle_print=$3 meta=0 print=0
-    [[ $launcher == 1 || $marker == pending-meta || $marker == pending-print ]] && meta=1
+    local marker=$1 launcher=$2 spectacle_print=$3 spectacle_meta=${4:-0} meta=0 print=0
+    [[ $launcher == 1 || $spectacle_meta == 1 || $marker == pending-meta || $marker == pending-print ]] && meta=1
     [[ $spectacle_print == 1 || $marker == pending-print || $marker == pending-print-add ]] && print=1
     if ((meta && print)); then echo pending-print
     elif ((meta)); then echo pending-meta
@@ -431,7 +430,7 @@ handover_keys_present() {
     while read -r key; do [[ -z $key ]] || has_key "$status" "$key" || return 1; done < <(handover_required_keys "$kind")
 }
 # Whether the daemon action must be unregistered and re-registered to acquire its defaults: only for a launcher handover
-# whose daemon lacks Meta+Shift+S.
+# or Spectacle handover whose daemon lacks Meta+Shift+S.
 handover_needs_reset() { [[ $1 == pending-meta || $1 == pending-print ]] && ! has_default_key "$2"; }
 # Whether Print must be added to the daemon's current keys after Spectacle gave it up.
 handover_needs_print() { [[ $1 == pending-print || $1 == pending-print-add ]] && ! has_key "$2" Print; }
@@ -464,4 +463,53 @@ print_relogin_note() {
     [[ -e ${state_dir:?}/relogin ]] || return 0
     echo "$1"
     rm -f -- "$state_dir/relogin"
+}
+
+# A fresh install has no legacy pipeline or existing overlay state. A complete legacy handover without this record
+# must remain on its historical rollback path. Keep the record after rollback so rollback itself is safe to repeat.
+fresh_install_needed() {
+    [[ -z $1 && -z $2 ]] || return 1
+    local relative
+    for relative in "$launcher_relative" "$spectacle_override_relative" \
+        .config/systemd/user/quick-region-clipboard.service .local/bin/quick-region-screenshot \
+        .local/libexec/quick-region-clipboard-service .local/libexec/quick-region-clipboard-service.py \
+        .local/libexec/quick-region-clipboard.py .local/libexec/quick-region-overlay \
+        .config/systemd/user/quick-region-overlay.service; do
+        [[ ! -e $HOME/$relative && ! -L $HOME/$relative ]] || return 1
+    done
+}
+load_fresh_keys() {
+    fresh_keys=()
+    [[ -f $fresh_file && ! -L $fresh_file ]] || fail "Invalid fresh-install record: $fresh_file. Nothing was changed."
+    mapfile -t fresh_keys <"$fresh_file"
+    local key
+    for key in "${fresh_keys[@]}"; do
+        [[ $key =~ ^[0-9]+\ [0-9]+\ [0-9]+\ [0-9]+$ ]] || fail "Invalid fresh-install keys in $fresh_file. Nothing was changed."
+    done
+    sequence_arguments "${fresh_keys[@]}" >/dev/null || fail "Invalid fresh-install keys in $fresh_file. Nothing was changed."
+}
+fresh_keys_restored() {
+    local keys expected
+    keys=$(action_keys org.kde.spectacle.desktop _launch) || return 1
+    expected=$(printf '%s\n' "${fresh_keys[@]}")
+    [[ $keys == "$expected" ]]
+}
+restore_fresh_keys() {
+    start_spectacle_action
+    if ((${#fresh_keys[@]})); then
+        set_action_key org.kde.spectacle.desktop _launch "${fresh_keys[@]}" || fail "Could not restore Spectacle's original keys."
+    else
+        set_foreign_shortcut_keys_empty
+    fi
+    wait_for 30 fresh_keys_restored || fail "Spectacle's original keys were not restored."
+    stop_spectacle_action
+}
+# Wait for the Type=dbus service and its action to be ready after a restart.
+wait_daemon_status() {
+    local answer try
+    for ((try = 0; try < 30; try++)); do
+        if answer=$(daemon_status 2>/dev/null) && [[ $answer != error:* ]]; then printf '%s\n' "$answer"; return 0; fi
+        sleep 0.1
+    done
+    return 1
 }

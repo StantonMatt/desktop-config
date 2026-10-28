@@ -187,6 +187,48 @@ for state in active activating reloading deactivating refreshing; do check "$sta
 check 'failed needs no stop' 1 state_needs_stop failed
 check 'inactive needs no stop' 1 state_needs_stop inactive
 
+# Fresh Spectacle Meta+Shift+S must trigger a handover of both defaults, including after an interruption.
+expect 'fresh Spectacle defaults' pending-print "$(handover_kind '' 0 1 1)"
+expect 'fresh Spectacle Meta alone' pending-meta "$(handover_kind '' 0 0 1)"
+expect 'fresh pending defaults survive retirement' pending-print "$(handover_kind pending-print 0 0 0)"
+fresh_profile_test() {
+    local state_dir fresh_file
+    state_dir="$HOME/fresh-state"
+    fresh_file="$state_dir/fresh-spectacle-keys"
+    mkdir -p "$state_dir"
+    check 'an empty profile is fresh' 0 fresh_install_needed '' ''
+    check 'a legacy complete handover is not fresh' 1 fresh_install_needed '' complete
+    check 'a legacy pending handover is not fresh' 1 fresh_install_needed '' pending-meta
+    check 'a previous launcher is not fresh' 1 fresh_install_needed originals ''
+    mkdir -p "$HOME/.local/libexec"
+    touch "$HOME/.local/libexec/quick-region-overlay"
+    check 'an existing overlay is not fresh' 1 fresh_install_needed '' ''
+    rm "$HOME/.local/libexec/quick-region-overlay"
+    spectacle_action_present() { return 0; }
+    action_keys() { cat "$state_dir/current"; }
+    set_action_key() { shift 2; printf '%s\n' "$@" >"$state_dir/current"; }
+    set_foreign_shortcut_keys_empty() { : >"$state_dir/current"; }
+    printf '%s\n' '16777225 0 0 0' '301989971 0 0 0' '218103866 218103865 0 0' >"$fresh_file"
+    load_fresh_keys
+    : >"$state_dir/current"
+    restore_fresh_keys
+    expect 'fresh rollback restores exact original keys including chords' "$(cat "$fresh_file")" "$(cat "$state_dir/current")"
+    restore_fresh_keys
+    expect 'fresh rollback is repeatable' "$(cat "$fresh_file")" "$(cat "$state_dir/current")"
+    : >"$fresh_file"
+    load_fresh_keys
+    restore_fresh_keys
+    expect 'fresh rollback restores originally cleared keys' '' "$(cat "$state_dir/current")"
+    echo 'not a key' >"$fresh_file"
+    check 'corrupt fresh records are refused' 1 load_fresh_keys
+    echo '2147483648 0 0 0' >"$fresh_file"
+    check 'out of range fresh keys are refused' 1 load_fresh_keys
+    rm "$fresh_file"
+    check 'missing fresh records are refused' 1 load_fresh_keys
+    exit $((failures > 0))
+}
+(fresh_profile_test) || { echo 'FAIL: fresh install and rollback helpers'; failures=$((failures + 1)); }
+
 mkdir -p "$(dirname -- "$launcher_entry")"
 [[ -z $(launcher_mode) ]] || { echo 'FAIL: no launcher has no mode'; failures=$((failures + 1)); }
 cp -- "$spectacle_fast_backup/$launcher_relative" "$launcher_entry"
