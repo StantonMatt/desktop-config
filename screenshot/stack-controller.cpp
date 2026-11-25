@@ -96,6 +96,8 @@ bool locked() {
 }
 
 StackController::StackController(QObject *parent) : QObject(parent), clipboard(this) {
+    storage.setMaxThreadCount(1);
+    storage.setExpiryTimeout(1000);
     qRegisterMetaType<ClipboardStack::Item>();
     directory = stateDirectory();
     cleanupClipboardHolders();
@@ -141,16 +143,15 @@ StackController::StackController(QObject *parent) : QObject(parent), clipboard(t
     connect(&clipboard, &StackClipboard::changed, this, [this] {
         if (operation == Operation::Copying) {
             copyChanged = true;
-            if (!keyRunning) { operation = Operation::CopySnapshot; deadline.stop(); takeSnapshot(); }
+            if (!keyRunning) { setOperation(Operation::CopySnapshot); deadline.stop(); takeSnapshot(); }
         }
     });
     connect(&clipboard, &StackClipboard::snapshotReady, this, [this](quint64 id, const Item &item, const QString &error) {
         if (id != serial) return;
         if (!error.isEmpty()) { finish(error); return; }
         if (operation == Operation::CopySnapshot) {
-            operation = Operation::Idle;
             if (!restorePending) original.clear();
-            if (item.isEmpty()) osd(QStringLiteral("Nothing copied")); else append(item);
+            if (item.isEmpty()) finish(QStringLiteral("Nothing copied")); else append(item);
         } else if (operation == Operation::RestoreSnapshot) {
             original = item;
             restorePending = true;
@@ -164,15 +165,24 @@ StackController::StackController(QObject *parent) : QObject(parent), clipboard(t
         if (operation == Operation::Restoring) {
             if (ok) restorePending = false;
             if (ok && pasteSucceeded) {
-                if (savePasteMarker(directory, items.size())) pasted = true;
-                else { finish(completion + QStringLiteral("; cannot save stack marker")); return; }
+                const QString path = directory, message = completion;
+                const qsizetype count = items.size();
+                storage.start([this, path, count, message] {
+                    const bool saved = savePasteMarker(path, count);
+                    QMetaObject::invokeMethod(this, [this, saved, message] {
+                        if (operation == Operation::Stopping) return;
+                        if (saved) pasted = true;
+                        finish(saved ? message : message + QStringLiteral("; cannot save stack marker"));
+                    }, Qt::QueuedConnection);
+                });
+                return;
             }
             finish(ok ? completion : QStringLiteral("Clipboard restore failed")); return;
         }
         if (operation != Operation::Offering) return;
         if (!ok) { restore(QStringLiteral("Clipboard offer failed")); return; }
         if (!sameTarget() || locked()) { restore(QStringLiteral("Focus changed")); return; }
-        operation = Operation::Pasting;
+        setOperation(Operation::Pasting);
         readSeen = false;
         key(false, kind(pasteItems[pasteIndex]) == Kind::Image, [this] {
             if (readSeen) grace.start(100);
@@ -214,15 +224,20 @@ StackController::StackController(QObject *parent) : QObject(parent), clipboard(t
 }
 StackController::~StackController() {
     shutdown();
+    storage.waitForDone(); // No worker can enqueue a callback after this receiver is destroyed.
     auto message = call(QStringLiteral("org.kde.KWin"), QStringLiteral("/Scripting"), QStringLiteral("org.kde.kwin.Scripting"), QStringLiteral("unloadScript"));
     message << scriptName;
     QDBusConnection::sessionBus().call(message, QDBus::Block, 500);
     if (keys.state() != QProcess::NotRunning) { keys.kill(); keys.waitForFinished(1000); releaseSyntheticKeys(); }
     if (releaseKeys.state() != QProcess::NotRunning && !releaseKeys.waitForFinished(1000)) { releaseKeys.kill(); releaseKeys.waitForFinished(250); }
 }
+void StackController::setOperation(Operation next) {
+    operation = next;
+    busyWheel.setBusy(next != Operation::Idle && next != Operation::Stopping);
+}
 void StackController::shutdown() {
     if (operation == Operation::Stopping) return;
-    operation = Operation::Stopping;
+    setOperation(Operation::Stopping);
     ++serial; // Invalidate all queued offer/snapshot/consumer callbacks before stopping key work.
     modifiers.stop(); deadline.stop(); grace.stop();
     afterKeys = {}; afterModifiers = {};
@@ -273,46 +288,78 @@ bool StackController::available() {
     if (!clipboard.ready()) { osd(QStringLiteral("Clipboard unavailable")); return false; }
     return true;
 }
+namespace {
+// Runs on the storage worker. Returns an empty string once the item is durably saved.
+QString persistItem(const QString &path, qsizetype count, AddMode mode, const Item &item) {
+    if (mode == AddMode::Replace) {
+        const QString staged = stageStackReplacement(path, item);
+        if (staged.isEmpty()) return QStringLiteral("Cannot save stack");
+        const bool committed = exchangeStackDirectories(path, staged);
+        if (!QDir(staged).removeRecursively()) qWarning() << "stack-replace-cleanup-failed" << staged;
+        return committed ? QString() : QStringLiteral("Cannot replace stack");
+    }
+    if (!saveStackItem(path, count, item)) return QStringLiteral("Cannot save stack");
+    QFile::remove(path + QStringLiteral("/pasted")); // Count mismatch already invalidates it durably.
+    return {};
+}
+}
+void StackController::appended(const Item &item, AddMode mode, const QString &error) {
+    if (operation == Operation::Stopping) return; // Already on disk; load() picks it up after restart.
+    if (!error.isEmpty()) { finish(error); return; }
+    if (mode == AddMode::Replace) items = {item}; else items << item;
+    pasted = false;
+    finish(mode == AddMode::Replace ? QStringLiteral("New stack: 1 item") : items.size() == 1 ? QStringLiteral("Stack: 1 item") : QStringLiteral("Stack: %1 items").arg(items.size()));
+}
 void StackController::append(const Item &item) {
+    if (!loadError.isEmpty()) { finish(loadError); return; }
+    const auto mode = addMode(items.size(), pasted, newStackAfterPaste());
+    if (mode == AddMode::Full) { finish(QStringLiteral("Stack full (100 items)")); return; }
+    if (!hasPayload(item)) { finish(QStringLiteral("Nothing copied")); return; }
+    if (size(item) > maxBytes) { finish(QStringLiteral("Item exceeds 64 MB")); return; }
+    setOperation(Operation::Saving);
+    const QString path = directory;
+    const qsizetype count = items.size();
+    storage.start([this, path, count, mode, item] {
+        const QString error = persistItem(path, count, mode, item);
+        QMetaObject::invokeMethod(this, [this, item, mode, error] { appended(item, mode, error); }, Qt::QueuedConnection);
+    });
+}
+void StackController::appendImage(const QImage &image) {
+    if (busy()) { osd(QStringLiteral("Stack busy")); return; }
     if (!loadError.isEmpty()) { osd(loadError); return; }
     const auto mode = addMode(items.size(), pasted, newStackAfterPaste());
     if (mode == AddMode::Full) { osd(QStringLiteral("Stack full (100 items)")); return; }
-    if (!hasPayload(item)) { osd(QStringLiteral("Nothing copied")); return; }
-    if (size(item) > maxBytes) { osd(QStringLiteral("Item exceeds 64 MB")); return; }
-    if (mode == AddMode::Replace) {
-        const QString staged = stageStackReplacement(directory, item);
-        if (staged.isEmpty()) { osd(QStringLiteral("Cannot save stack")); return; }
-        const bool committed = exchangeStackDirectories(directory, staged);
-        if (!QDir(staged).removeRecursively()) qWarning() << "stack-replace-cleanup-failed" << staged;
-        if (!committed) { osd(QStringLiteral("Cannot replace stack")); return; }
-        items = {item};
-        pasted = false;
-        osd(QStringLiteral("New stack: 1 item"));
-        return;
-    }
-    if (!saveStackItem(directory, items.size(), item)) { osd(QStringLiteral("Cannot save stack")); return; }
-    items << item;
-    pasted = false;
-    QFile::remove(directory + QStringLiteral("/pasted")); // Count mismatch already invalidates it durably.
-    osd(items.size() == 1 ? QStringLiteral("Stack: 1 item") : QStringLiteral("Stack: %1 items").arg(items.size()));
-}
-void StackController::appendImage(const QImage &image) {
-    QByteArray png;
-    QBuffer buffer(&png);
-    buffer.open(QIODevice::WriteOnly);
-    if (!image.save(&buffer, "PNG")) { osd(QStringLiteral("Cannot encode image")); return; }
-    append({{QStringLiteral("image/png"), png}});
+    setOperation(Operation::Saving);
+    const QString path = directory;
+    const qsizetype count = items.size();
+    // Encode and save in one job, so shutdown's waitForDone() also drains the save of an accepted screenshot.
+    storage.start([this, image, path, count, mode] {
+        QByteArray png;
+        QBuffer buffer(&png);
+        buffer.open(QIODevice::WriteOnly);
+        QString error;
+        if (!image.save(&buffer, "PNG")) error = QStringLiteral("Cannot encode image");
+        const Item encoded{{QStringLiteral("image/png"), png}};
+        if (error.isEmpty() && size(encoded) > maxBytes) error = QStringLiteral("Item exceeds 64 MB");
+        if (error.isEmpty()) error = persistItem(path, count, mode, encoded);
+        QMetaObject::invokeMethod(this, [this, encoded, mode, error] { appended(encoded, mode, error); }, Qt::QueuedConnection);
+    });
 }
 void StackController::clear() {
     if (busy()) { osd(QStringLiteral("Stack busy")); return; }
+    setOperation(Operation::Saving);
     // Rename is the commit point; a crash during deletion cannot resurrect a partially cleared stack.
     const QString trash = directory + QStringLiteral("-cleared-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
-    if (QDir(directory).exists() && !QDir().rename(directory, trash)) { osd(QStringLiteral("Cannot clear stack")); return; }
+    if (QDir(directory).exists() && !QDir().rename(directory, trash)) { finish(QStringLiteral("Cannot clear stack")); return; }
     items.clear();
     pasted = false;
     loadError.clear();
-    if (QDir(trash).exists() && !QDir(trash).removeRecursively()) qWarning() << "stack-clear-cleanup-failed" << trash;
-    osd(QStringLiteral("Stack cleared"));
+    storage.start([this, trash] {
+        if (QDir(trash).exists() && !QDir(trash).removeRecursively()) qWarning() << "stack-clear-cleanup-failed" << trash;
+        QMetaObject::invokeMethod(this, [this] {
+            if (operation != Operation::Stopping) finish(QStringLiteral("Stack cleared"));
+        }, Qt::QueuedConnection);
+    });
 }
 bool StackController::sameTarget() const { return !targetLeft && (targetId.isEmpty() || activeId == targetId); }
 void StackController::waitModifiers(std::function<void()> next) {
@@ -320,17 +367,17 @@ void StackController::waitModifiers(std::function<void()> next) {
     targetLeft = false;
     targetTerminal = terminal(activeClass);
     afterModifiers = std::move(next);
-    operation = Operation::Modifiers;
+    setOperation(Operation::Modifiers);
     modifierTime.start();
     modifiers.start();
 }
 void StackController::copy() {
     if (!canAdd()) return;
     waitModifiers([this] {
-        operation = Operation::Copying;
+        setOperation(Operation::Copying);
         copyChanged = false;
         key(true, false, [this] {
-            if (copyChanged) { operation = Operation::CopySnapshot; deadline.stop(); takeSnapshot(); }
+            if (copyChanged) { setOperation(Operation::CopySnapshot); deadline.stop(); takeSnapshot(); }
         });
     });
 }
@@ -338,7 +385,7 @@ void StackController::paste() {
     if (!available()) return;
     if (items.isEmpty()) { osd(QStringLiteral("Stack empty")); return; }
     pasteSucceeded = false;
-    waitModifiers([this] { operation = Operation::RestoreSnapshot; takeSnapshot(std::numeric_limits<qint64>::max()); });
+    waitModifiers([this] { setOperation(Operation::RestoreSnapshot); takeSnapshot(std::numeric_limits<qint64>::max()); });
 }
 void StackController::takeSnapshot(qint64 limit) {
     const quint64 id = ++serial;
@@ -376,19 +423,19 @@ void StackController::nextPaste() {
     if (pasteIndex >= pasteItems.size()) { pasteSucceeded = true; restore(QStringLiteral("Pasted %1 items").arg(items.size())); return; }
     auto item = pasteItems[pasteIndex];
     item.insert(secretHint, QByteArrayLiteral("secret"));
-    operation = Operation::Offering;
+    setOperation(Operation::Offering);
     deadline.start(1500);
     clipboard.offer(item, ++serial);
 }
 void StackController::restore(const QString &message) {
     grace.stop(); deadline.stop();
     completion = message;
-    operation = Operation::Restoring;
+    setOperation(Operation::Restoring);
     clipboard.offer(original, ++serial);
 }
 void StackController::finish(const QString &message) {
     modifiers.stop(); deadline.stop(); grace.stop();
-    operation = Operation::Idle;
+    setOperation(Operation::Idle);
     pasteSucceeded = false;
     pasteItems.clear(); if (!restorePending) original.clear(); afterKeys = {}; afterModifiers = {};
     osd(message);

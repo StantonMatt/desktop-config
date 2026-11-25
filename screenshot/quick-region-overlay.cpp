@@ -374,6 +374,8 @@ private:
         if (fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_SEAL) < 0) { const int error = errno; ::close(fd); captureFailed(QStringLiteral("memfd-seal %1").arg(strerror(error))); return; }
         QVariantMap options;
         options.insert(QStringLiteral("include-cursor"), false);
+        // Also exclude any just-unmapped busy surface still awaiting a compositor frame.
+        options.insert(QStringLiteral("hide-caller-windows"), true);
         options.insert(QStringLiteral("native-resolution"), true);
         auto message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.KWin"), QStringLiteral("/org/kde/KWin/ScreenShot2"), QStringLiteral("org.kde.KWin.ScreenShot2"), QStringLiteral("CaptureWorkspace"));
         message << options << QVariant::fromValue(QDBusUnixFileDescriptor(fd));

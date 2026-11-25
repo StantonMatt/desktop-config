@@ -21,7 +21,8 @@ BUILD = pathlib.Path(sys.argv[1]).resolve()
 OUT = pathlib.Path(os.environ.get('QRO_STACK_OUT') or pathlib.Path.home() / '.cache/agent-scratch/desktop-config/clipboard-stack/e2e')
 OUT.mkdir(parents=True, exist_ok=True)
 TERMINAL_ONLY = os.environ.get('QRO_TERMINAL_ONLY') == '1'
-runtime = pathlib.Path(os.environ.get('QRO_STACK_RUNTIME') or tempfile.mkdtemp(prefix='qro-stack-'))
+# Keep the socket path short (sockaddr_un allows only 108 bytes), alongside the scratch build.
+runtime = pathlib.Path(os.environ.get('QRO_STACK_RUNTIME') or tempfile.mkdtemp(prefix='r-', dir=BUILD.parent))
 os.environ['QRO_STACK_RUNTIME'] = str(runtime)
 runtime.mkdir(exist_ok=True, mode=0o700)
 os.chmod(runtime, 0o700)
@@ -56,6 +57,7 @@ apps = OUT / 'data/applications'
 apps.mkdir(parents=True, exist_ok=True)
 (apps / 'quick-region-overlay.desktop').write_text('[Desktop Entry]\nType=Application\nName=Quick Region Overlay\nExec=' + str(BUILD / 'quick-region-overlay') + ' --capture\nNoDisplay=true\nX-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2\n')
 (apps / 'qro-stack-input.desktop').write_text('[Desktop Entry]\nType=Application\nName=QRO isolated input test\nExec=' + str(BUILD / 'stack-input') + '\nNoDisplay=true\nX-KDE-Wayland-Interfaces=org_kde_kwin_fake_input\n')
+(apps / 'qro-stack-probe.desktop').write_text('[Desktop Entry]\nType=Application\nName=QRO isolated clipboard probe\nExec=' + str(BUILD / 'stack-probe') + '\nNoDisplay=true\nX-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2\n')
 config = OUT / 'config'
 config.mkdir(exist_ok=True)
 (config / 'kglobalshortcutsrc').write_text('[services][org.kde.spectacle.desktop]\n_launch=none\n')
@@ -115,7 +117,7 @@ def history():
         (OUT / 'history-error').write_text(result.stderr + '\n' + result.stdout)
     return result.stdout.strip()
 
-def copy(text, expected):
+def prepare(text):
     probe('Prepare', text)
     if probe('FocusReady') != 'true':
         info = dbus('org.kde.KWin', '/KWin', 'org.kde.KWin.getWindowInfo', stack('FocusId'))
@@ -124,6 +126,9 @@ def copy(text, expected):
         run(str(BUILD / 'stack-input'), 'drag', str(x), str(y), str(x), str(y))
         probe('Prepare', text)
         wait(lambda: probe('FocusReady') == 'true', 'test editor keyboard focus')
+
+def copy(text, expected):
+    prepare(text)
     shortcut('c')
     wait(lambda: stack('Count') == str(expected), f'copy {expected}')
 
@@ -146,6 +151,103 @@ def capture(expected):
     run(str(BUILD / 'stack-input'), 'drag', '300', '300', '420', '380')
     wait(lambda: stack('Count') == str(expected), 'stack screenshot')
 
+def observe_windows():
+    script = OUT / 'observe-windows.js'
+    script.write_text("""
+var previous = '';
+function report() {
+    var rows = workspace.stackingOrder.map(function(w) {
+        return {id: String(w.internalId), caption: w.caption, resourceClass: w.resourceClass,
+                active: w.active, wantsInput: w.wantsInput, hidden: w.hidden, deleted: w.deleted,
+                x: w.x, y: w.y, width: w.width, height: w.height};
+    });
+    var state = JSON.stringify(rows);
+    if (state !== previous) {
+        previous = state;
+        callDBus('org.local.StackProbe', '/', 'org.local.StackProbe', 'ObserveWindows', state);
+    }
+}
+workspace.windowActivated.connect(function(w) {
+    callDBus('org.local.StackProbe', '/', 'org.local.StackProbe', 'ObserveActivation', w ? String(w.internalId) : '', w ? w.caption : '');
+});
+var timer = new QTimer(); timer.interval = 17; timer.timeout.connect(report); timer.start(); report();
+""")
+    script_id = dbus('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting.loadScript', script, 'qro-test-windows')
+    dbus('org.kde.KWin', '/Scripting/Script' + script_id, 'org.kde.kwin.Script.run')
+    wait(lambda: probe('Windows'), 'window observer')
+
+def wheels():
+    # KWin exposes the daemon's app_id for layer surfaces, rather than the layer-shell scope/title.
+    return [w for w in json.loads(probe('Windows')) if is_wheel(w)]
+
+def is_wheel(window):
+    return (window.get('resourceClass') == 'quick-region-overlay' and
+            window['width'] == 28 and window['height'] == 28 and not window['hidden'])
+
+def wheel_at(x, y):
+    current = wheels()
+    return current[0] if len(current) == 1 and (current[0]['x'], current[0]['y']) == (x, y) else None
+
+def spinner_checks():
+    focus = stack('FocusId')
+    # The existing 250 ms scenario remains uninstrumented for timing comparison. This longer read leaves
+    # time for compositor screenshots and input checks while exercising the same paste path.
+    for color, name in [('#f5f5f5', 'light'), ('#202124', 'dark')]:
+        wait(lambda: not wheels(), 'previous busy wheel unmapped')
+        probe('Background', color)
+        run(str(BUILD / 'stack-input'), 'mouse', '400', '400')
+        probe('PasteDelay', 800); probe('ResetEvents')
+        activation_start = len(json.loads(probe('Activations')))
+        shortcut('v')
+        wheel = wait(lambda: wheel_at(416, 416), 'busy wheel during slow paste')
+        assert not wheel['active'] and not wheel['wantsInput'], wheel
+        assert wheel['width'] == 28 and wheel['height'] == 28, wheel
+        assert (wheel['x'], wheel['y']) == (416, 416), wheel
+        assert stack('FocusId') == focus and probe('Active') == 'true'
+        assert probe('Screenshot', OUT / ('spinner-' + name + '.png')) == 'true'
+        run(str(BUILD / 'stack-input'), 'mouse', '1100', '400')
+        wait(lambda: wheel_at(1116, 416), 'wheel moves to second output only')
+        run(str(BUILD / 'stack-input'), 'mouse', '460', '420')
+        moved = wait(lambda: wheel_at(476, 436), 'wheel returns to first output only')
+        clicks = int(probe('Clicks'))
+        # Motion and press share a Wayland batch: hit the old wheel before the throttled tracker moves it.
+        run(str(BUILD / 'stack-input'), 'mouse', str(int(moved['x']) + 14), str(int(moved['y']) + 14), '1')
+        run(str(BUILD / 'stack-input'), 'mouse', str(int(moved['x']) + 14), str(int(moved['y']) + 14), '0')
+        wait(lambda: int(probe('Clicks')) == clicks + 1, 'pointer click passes through busy wheel')
+        moved = wait(lambda: wheel_at(506, 466), 'wheel after click')
+        scrolls = int(probe('Scrolls'))
+        run(str(BUILD / 'stack-input'), 'wheel', str(int(moved['x']) + 14), str(int(moved['y']) + 14))
+        wait(lambda: int(probe('Scrolls')) == scrolls + 1, 'scroll passes through busy wheel')
+        wait(lambda: stack('State') == '0:4', 'slow paste with busy wheel finishes')
+        wait(lambda: not wheels(), 'busy wheel unmapped on completion', timeout=0.1)
+        wait(lambda: dbus('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting.isScriptLoaded', 'quick-region-overlay-stack-pointer') == 'false', 'pointer script unloaded while idle')
+        run(str(BUILD / 'stack-input'), 'mouse', '600', '500')
+        assert dbus('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting.isScriptLoaded', 'quick-region-overlay-stack-pointer') == 'false'
+        assert not wheels(), 'idle pointer motion restarted busy tracking'
+        events = json.loads(probe('Events'))
+        assert len(events) == 3 and 'image/png' in events[1], events
+        assert base64.b64decode(events[0]['text/plain']) == b'one\ntwo'
+        assert base64.b64decode(events[2]['text/plain']) == b'three'
+        activations = json.loads(probe('Activations'))[activation_start:]
+        assert activations == [], activations
+        assert stack('FocusId') == focus and probe('Active') == 'true'
+        passed('busy wheel: ' + name + ' background, tracking, click/scroll passthrough, no activation, successful paste, immediate hide', wheel=wheel)
+    probe('PasteDelay', 0)
+    # Capture the area just occupied by the busy wheel. The frozen image must contain only the app background.
+    probe('SaveClipboard')
+    wait(lambda: probe('SavedState').startswith('ready:'), 'save clipboard before capture check')
+    input_keys('99:1', '99:0')
+    wait(lambda: any(w['resourceClass'] == 'quick-region-overlay' and w['width'] == 1024 for w in json.loads(probe('Windows'))), 'Print capture overlay')
+    run(str(BUILD / 'stack-input'), 'drag', '530', '490', '570', '530')
+    image = clipboard()['image/png']
+    (OUT / 'capture-without-spinner.png').write_bytes(image)
+    assert probe('ClipboardImageUniform', '#202124') == 'true', 'busy wheel leaked into frozen capture'
+    probe('RestoreSaved')
+    wait(lambda: stack('FocusId') == focus, 'focus returns after capture')
+    passed('Print frozen image excludes previous busy wheel', crop='530,490 41x41')
+    (OUT / 'window-events.json').write_text(probe('WindowEvents'))
+    (OUT / 'activations.json').write_text(probe('Activations'))
+
 results = []
 def passed(name, **evidence):
     results.append(dict(check=name, **evidence))
@@ -155,19 +257,33 @@ def passed(name, **evidence):
 with contextlib.ExitStack() as cleanup:
     def start(name, args):
         log = cleanup.enter_context((OUT / (name + '.log')).open('a'))
-        process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
+        environment = os.environ.copy()
+        if args[0] == str(BUILD / 'quick-region-overlay'):
+            environment['LD_PRELOAD'] = str(BUILD / 'libstack-modifiers.so')
+            environment['QRO_STACK_SAVE_GATE'] = str(OUT / 'save-gate')
+        process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, env=environment)
         cleanup.callback(stop, process)
         print(name, 'PID', process.pid, flush=True)
         return process
-    kwin = start('kwin', ['kwin_wayland', '--virtual', '--width', '1024', '--height', '768', '--socket', 'qro-stack-test-0', '--no-lockscreen', '--no-kactivities'])
+    kwin = start('kwin', ['kwin_wayland', '--virtual', '--width', '1024', '--height', '768', '--output-count', '2', '--socket', 'qro-stack-test-0', '--no-lockscreen', '--no-kactivities'])
     wait(lambda: (runtime / 'qro-stack-test-0').exists() and dbus('org.kde.KWin', '/KWin', 'org.kde.KWin.activeOutputName'), 'virtual KWin')
     keyboard = start('input-keeper', [str(BUILD / 'stack-input'), '--keepalive'])
     shell = start('klipper', [str(BUILD / 'stack-klipper')])
     wait(lambda: dbus('org.kde.klipper', '/klipper', 'org.freedesktop.DBus.Peer.Ping') == '', 'Klipper', timeout=20)
     (OUT / 'klipper-methods').write_text(run('qdbus6', 'org.kde.klipper', '/klipper', check=False))
+    editor = start('probe', [str(BUILD / 'stack-probe')])
+    def save_window_evidence():
+        if editor.poll() is None and not TERMINAL_ONLY:
+            (OUT / 'window-events.json').write_text(probe('WindowEvents'))
+            (OUT / 'activations.json').write_text(probe('Activations'))
+    cleanup.callback(save_window_evidence)
+    # KWin 6.6 uses scripts.size() for D-Bus script IDs. Keep this persistent observer below the
+    # daemon scripts, so removing/reloading its focus tracker cannot collide with our observer's ID.
+    if not TERMINAL_ONLY: observe_windows()
+    if os.environ.get('QRO_TRACE_POINTER') == '1':
+        start('pointer-dbus', ['dbus-monitor', "member='CursorPosition'", "member='ActiveWindow'"])
     daemon = start('daemon', [str(BUILD / 'quick-region-overlay'), '--daemon'])
     wait(lambda: stack('State'), 'daemon')
-    editor = start('probe', [str(BUILD / 'stack-probe')])
     wait(lambda: stack('Focus') == 'qro-stack-probe', 'editor focus')
     # Existing isolated data from an interrupted run belongs to this harness.
     shortcut('x'); wait(lambda: stack('Count') == '0', 'initial clear')
@@ -194,7 +310,21 @@ with contextlib.ExitStack() as cleanup:
         probe('Custom', 'image', '#224466'); probe('Offer')
         wait(lambda: history() != text_history, 'Klipper keeps image after live reload')
         passed('Klipper reloadConfig applies history limit and image preference live', before_reload=3, after_reload=2, images_kept=history())
-        copy('alpha', 1)
+        prepare('alpha')
+        # Hold the actual fsync in the isolated daemon, rather than sleeping in the test driver.
+        gate = OUT / 'save-gate'
+        gate.touch()
+        try:
+            shortcut('c')
+            wait(lambda: stack('State') == '9:0', 'copy persistence barrier')
+            wheel = wait(lambda: wheels(), 'busy wheel during disk save')[0]
+            assert not wheel['active'] and not wheel['wantsInput']
+            assert probe('Active') == 'true'
+        finally:
+            gate.unlink(missing_ok=True)
+        wait(lambda: stack('State') == '0:1', 'copy save completion')
+        wait(lambda: not wheels(), 'wheel hides after save', timeout=0.1)
+        passed('busy wheel remains responsive during copy persistence and hides after save')
         assert clipboard()['text/plain'] == b'alpha'
         probe('ResetEvents')
         input_keys('29:1', '47:1', '47:0', '29:0')
@@ -202,7 +332,16 @@ with contextlib.ExitStack() as cleanup:
         assert base64.b64decode(first[0]['text/plain']) == b'alpha'
         copy('alpha', 2)
         passed('GUI copy, identical copies, normal paste', count=2)
+        fast_start = len(json.loads(probe('WindowEvents')))
+        clear_start = time.monotonic()
         shortcut('x'); wait(lambda: stack('Count') == '0', 'clear')
+        clear_ms = (time.monotonic() - clear_start) * 1000
+        assert clear_ms < 150, ('fast-operation fixture took too long', clear_ms)
+        time.sleep(0.18)
+        fast_events = json.loads(probe('WindowEvents'))[fast_start:]
+        assert not any(is_wheel(w) for e in fast_events for w in e['state']), fast_events
+        assert dbus('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting.isScriptLoaded', 'quick-region-overlay-stack-pointer') == 'false'
+        passed('fast clear below 150 ms never maps busy wheel or loads pointer script', elapsed_ms=round(clear_ms, 1))
         copy('one', 1); copy('two', 2)
         probe('Custom', 'image', '#ff0000'); shortcut('c'); wait(lambda: stack('Count') == '3', 'copy image')
         copy('three', 4)
@@ -232,16 +371,19 @@ with contextlib.ExitStack() as cleanup:
         assert 'image/png' in delayed[1]
         assert base64.b64decode(delayed[2]['text/plain']) == b'three'
         passed('repeat paste while marked preserves the same text/image/text set', count=4)
+        spinner_checks()
         probe('PasteDelay', 0); probe('IgnorePaste', 'true'); probe('ResetEvents'); shortcut('v')
         wait(lambda: stack('State').startswith('6:'), 'target offered item')
         wait(lambda: stack('State') == '0:4', 'no-read timeout')
         assert json.loads(probe('Events')) == []
         assert clipboard() == before
         probe('IgnorePaste', 'false')
+        wait(lambda: not wheels(), 'busy wheel unmapped after failure', timeout=0.1)
         passed('read-driven pacing survives 250 ms target delay; no-read timeout restores clipboard')
         stop(daemon)
         daemon = start('daemon-restart', [str(BUILD / 'quick-region-overlay'), '--daemon'])
         wait(lambda: stack('State') == '0:4', 'persisted stack')
+        wait(lambda: stack('Focus') == 'qro-stack-probe', 'focus script after daemon restart')
         assert pasted(4)
         passed('daemon restart preserves stack and pasted marker', count=4)
         nothing_before = osd_count('Nothing copied')
@@ -274,6 +416,7 @@ with contextlib.ExitStack() as cleanup:
         stop(daemon)
         daemon = start('daemon-cleared', [str(BUILD / 'quick-region-overlay'), '--daemon'])
         wait(lambda: stack('State') == '0:0', 'clear survives restart')
+        wait(lambda: stack('Focus') == 'qro-stack-probe', 'focus script after cleared daemon restart')
         assert not MARKER.exists()
         passed('clear persists', count=0)
         passed('shortcuts', capture=dbus('org.local.QuickRegionOverlay', '/', 'org.local.QuickRegionOverlay.ShortcutStatus'), stack=dbus('org.local.QuickRegionOverlay', '/', 'org.local.QuickRegionOverlay.StackShortcutStatus'))

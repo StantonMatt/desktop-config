@@ -39,6 +39,10 @@ int main(int argc, char **argv) {
         wl_display_roundtrip(display); usleep(30000);
         org_kde_kwin_fake_input_button(input, 272, 0);
         wl_display_roundtrip(display); usleep(30000);
+    } else if (argc > 1 && strcmp(argv[1], "wheel") == 0) {
+        org_kde_kwin_fake_input_pointer_motion_absolute(input, wl_fixed_from_int(atoi(argv[2])), wl_fixed_from_int(atoi(argv[3])));
+        org_kde_kwin_fake_input_axis(input, 0, wl_fixed_from_int(15));
+        wl_display_roundtrip(display);
     } else if (argc > 1 && strcmp(argv[1], "mouse") == 0) {
         org_kde_kwin_fake_input_pointer_motion_absolute(input, wl_fixed_from_int(atoi(argv[2])), wl_fixed_from_int(atoi(argv[3])));
         if (argc > 4) org_kde_kwin_fake_input_button(input, 272, atoi(argv[4]));

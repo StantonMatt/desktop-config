@@ -1,9 +1,11 @@
 #pragma once
 #include "stack-clipboard.h"
+#include "stack-busy.h"
 #include <QElapsedTimer>
 #include <QProcess>
 #include <QTemporaryFile>
 #include <QTimer>
+#include <QThreadPool>
 #include <functional>
 
 class StackController final : public QObject {
@@ -27,8 +29,12 @@ public slots:
     QString Focus() const { return activeClass; }
     QString FocusId() const { return activeId; }
 private:
-    enum class Operation { Idle, Modifiers, Copying, CopySnapshot, RestoreSnapshot, Offering, Pasting, Restoring, Stopping };
+    void appended(const ClipboardStack::Item &item, ClipboardStack::AddMode mode, const QString &error);
+    enum class Operation { Idle, Modifiers, Copying, CopySnapshot, RestoreSnapshot, Offering, Pasting, Restoring, Stopping, Saving };
     Operation operation = Operation::Idle;
+    StackBusy busyWheel{this};
+    QThreadPool storage;
+    void setOperation(Operation next);
     StackClipboard clipboard;
     QList<ClipboardStack::Item> items, pasteItems;
     ClipboardStack::Item original;

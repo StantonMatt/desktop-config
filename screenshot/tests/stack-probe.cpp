@@ -15,6 +15,15 @@
 #include <QCryptographicHash>
 #include <QSaveFile>
 #include <QFile>
+#include <QDBusMessage>
+#include <QDBusArgument>
+#include <QDBusUnixFileDescriptor>
+#include <QDateTime>
+#include <QMouseEvent>
+#include <QWheelEvent>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <limits>
 
 using namespace ClipboardStack;
@@ -38,6 +47,9 @@ public:
     bool suppressCopy = false;
     bool ignorePaste = false;
     int pasteDelay = 0;
+    int clicks = 0, scrolls = 0;
+    QJsonArray windows, activations;
+    QString windowState;
     explicit Probe() {
         resize(800, 600);
         setWindowTitle(QStringLiteral("QRO dedicated stack test"));
@@ -77,7 +89,58 @@ public:
         }
         QPlainTextEdit::keyPressEvent(event);
     }
+    void mousePressEvent(QMouseEvent *event) override { ++clicks; QPlainTextEdit::mousePressEvent(event); }
+    void wheelEvent(QWheelEvent *event) override { ++scrolls; QPlainTextEdit::wheelEvent(event); }
 public slots:
+    bool Active() const { return isActiveWindow() && QApplication::focusWidget() && (QApplication::focusWidget() == this || isAncestorOf(QApplication::focusWidget())); }
+    int Clicks() const { return clicks; }
+    int Scrolls() const { return scrolls; }
+    void Background(const QString &color) { setStyleSheet(QStringLiteral("QPlainTextEdit { background: %1; }").arg(color)); }
+    void ObserveWindows(const QString &state) {
+        windowState = state;
+        windows << QJsonObject{{QStringLiteral("time"), QDateTime::currentMSecsSinceEpoch()}, {QStringLiteral("state"), QJsonDocument::fromJson(state.toUtf8()).array()}};
+    }
+    void ObserveActivation(const QString &id, const QString &caption) {
+        activations << QJsonObject{{QStringLiteral("time"), QDateTime::currentMSecsSinceEpoch()}, {QStringLiteral("id"), id}, {QStringLiteral("caption"), caption}};
+    }
+    QString Windows() const { return windowState; }
+    QString WindowEvents() const { return QString::fromUtf8(QJsonDocument(windows).toJson(QJsonDocument::Compact)); }
+    QString Activations() const { return QString::fromUtf8(QJsonDocument(activations).toJson(QJsonDocument::Compact)); }
+    bool ClipboardImageUniform(const QString &color) const {
+        const auto image = QImage::fromData(lastSnapshot.value(QStringLiteral("image/png")));
+        if (image.isNull()) return false;
+        const QColor expected(color);
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x)
+                if (image.pixelColor(x, y) != expected) return false;
+        return true;
+    }
+    bool Screenshot(const QString &path) {
+        const int fd = memfd_create("stack-test-screenshot", MFD_CLOEXEC);
+        if (fd < 0) return false;
+        auto message = QDBusMessage::createMethodCall(QStringLiteral("org.kde.KWin"), QStringLiteral("/org/kde/KWin/ScreenShot2"), QStringLiteral("org.kde.KWin.ScreenShot2"), QStringLiteral("CaptureWorkspace"));
+        message << QVariantMap{{QStringLiteral("include-cursor"), true}, {QStringLiteral("native-resolution"), true}, {QStringLiteral("hide-caller-windows"), false}} << QVariant::fromValue(QDBusUnixFileDescriptor(fd));
+        const auto reply = QDBusConnection::sessionBus().call(message, QDBus::Block, 2000);
+        bool ok = false;
+        if (reply.type() != QDBusMessage::ErrorMessage && reply.arguments().size() == 1) {
+            const auto meta = qdbus_cast<QVariantMap>(reply.arguments()[0]);
+            const int width = meta.value(QStringLiteral("width")).toInt(), height = meta.value(QStringLiteral("height")).toInt();
+            const int stride = meta.value(QStringLiteral("stride")).toInt();
+            const qint64 bytes = qint64(stride) * height;
+            const auto format = QImage::Format(meta.value(QStringLiteral("format")).toInt());
+            struct stat info {};
+            for (int i = 0; i < 2000 && fstat(fd, &info) == 0 && info.st_size < bytes; ++i) usleep(1000);
+            if (width > 0 && height > 0 && stride > 0 && bytes > 0 && info.st_size >= bytes) {
+                void *data = mmap(nullptr, bytes, PROT_READ, MAP_SHARED, fd, 0);
+                if (data != MAP_FAILED) {
+                    ok = QImage(static_cast<const uchar *>(data), width, height, stride, format).save(path);
+                    munmap(data, bytes);
+                }
+            }
+        }
+        ::close(fd);
+        return ok;
+    }
     void Prepare(const QString &text) { custom = false; setPlainText(text); selectAll(); setFocus(); }
     bool FocusReady() const { return isActiveWindow() && textCursor().hasSelection() && QApplication::focusWidget() && (QApplication::focusWidget() == this || isAncestorOf(QApplication::focusWidget())); }
     void SuppressCopy(bool suppress) { suppressCopy = suppress; }

@@ -18,7 +18,7 @@ add_custom_command(OUTPUT ext-data-control-v1-protocol.c
     COMMAND ${WAYLAND_SCANNER} private-code ${CMAKE_CURRENT_SOURCE_DIR}/ext-data-control-v1.xml ${CMAKE_CURRENT_BINARY_DIR}/ext-data-control-v1-protocol.c
     DEPENDS ext-data-control-v1.xml)
 add_executable(quick-region-overlay quick-region-overlay.cpp selection-geometry.h capture-checks.h daemon-logic.h
-    clipboard-stack.h stack-storage.h stack-controller.h stack-controller.cpp stack-clipboard.h stack-clipboard.cpp stack-holder.h stack-holder.cpp
+    clipboard-stack.h stack-storage.h stack-controller.h stack-controller.cpp stack-busy.h stack-busy.cpp stack-clipboard.h stack-clipboard.cpp stack-holder.h stack-holder.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/ext-data-control-v1-client-protocol.h ${CMAKE_CURRENT_BINARY_DIR}/ext-data-control-v1-protocol.c)
 target_include_directories(quick-region-overlay PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(quick-region-overlay PRIVATE Qt6::Core Qt6::Gui Qt6::DBus Qt6::Widgets LayerShellQt::Interface KF6::GuiAddons KF6::GlobalAccel PkgConfig::WaylandClient)
@@ -41,6 +41,8 @@ add_test(NAME scripts COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check-scrip
 add_test(NAME script-helpers COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/script-helpers-test.sh)
 
 # Manual, isolated Wayland integration harness (not run against a user's desktop by ctest).
+add_library(stack-modifiers SHARED EXCLUDE_FROM_ALL tests/stack-modifiers.c)
+target_link_libraries(stack-modifiers PRIVATE ${CMAKE_DL_LIBS})
 add_custom_command(OUTPUT fake-input-client-protocol.h
     COMMAND ${WAYLAND_SCANNER} client-header ${CMAKE_CURRENT_SOURCE_DIR}/tests/fake-input.xml ${CMAKE_CURRENT_BINARY_DIR}/fake-input-client-protocol.h
     DEPENDS tests/fake-input.xml)
@@ -48,6 +50,7 @@ add_custom_command(OUTPUT fake-input-protocol.c
     COMMAND ${WAYLAND_SCANNER} private-code ${CMAKE_CURRENT_SOURCE_DIR}/tests/fake-input.xml ${CMAKE_CURRENT_BINARY_DIR}/fake-input-protocol.c
     DEPENDS tests/fake-input.xml)
 add_executable(stack-input EXCLUDE_FROM_ALL tests/stack-input.cpp ${CMAKE_CURRENT_BINARY_DIR}/fake-input-client-protocol.h ${CMAKE_CURRENT_BINARY_DIR}/fake-input-protocol.c)
+add_dependencies(stack-input stack-modifiers)
 target_include_directories(stack-input PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(stack-input PRIVATE PkgConfig::WaylandClient)
 add_executable(stack-probe EXCLUDE_FROM_ALL tests/stack-probe.cpp stack-clipboard.cpp stack-clipboard.h clipboard-stack.h
