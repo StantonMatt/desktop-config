@@ -8,6 +8,9 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
 
 static void save_barrier(void) {
     // A deterministic disk barrier verifies that the wheel keeps animating during persistence.
@@ -40,4 +43,17 @@ int ioctl(int fd, unsigned long request, ...) {
     }
     int (*real_ioctl)(int, unsigned long, ...) = dlsym(RTLD_NEXT, "ioctl");
     return real_ioctl(fd, request, argument);
+}
+
+ssize_t write(int fd, const void *buffer, size_t count) {
+    // The isolated daemon must never write keys into the live desktop's /dev/input devices (char major 13).
+    const char *display = getenv("WAYLAND_DISPLAY");
+    struct stat info;
+    if (display && strncmp(display, "qro-stack-test-", 15) == 0 && fstat(fd, &info) == 0 && S_ISCHR(info.st_mode)
+        && major(info.st_rdev) == 13) {
+        errno = EPERM;
+        return -1;
+    }
+    ssize_t (*real_write)(int, const void *, size_t) = dlsym(RTLD_NEXT, "write");
+    return real_write(fd, buffer, count);
 }

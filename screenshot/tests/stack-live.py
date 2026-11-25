@@ -89,25 +89,15 @@ try:
     probe('Prepare', 'qro-live-key-probe')
     probe('ResetEvents')
     keys('29:1', '56:1', '46:1', '46:0'); held = True
-    time.sleep(0.35)
-    assert json.loads(probe('Events')) == [], 'Copy fired before physical modifiers were released'
-    guard(); run('/usr/bin/ydotool', 'key', '--key-delay=5', '56:0', '29:0'); held = False
-    event = wait(lambda: (events[0] if (events := json.loads(probe('Events'))) else None), 'copy key after release')
+    # The held keyboard is writable, so the daemon writes Alt-up + Ctrl+C into it without waiting for a release.
+    event = wait(lambda: (events[0] if (events := json.loads(probe('Events'))) else None), 'copy key while held')
     assert event == {'_copy': True, 'alt': False, 'shift': False}, event
+    guard(); run('/usr/bin/ydotool', 'key', '--key-delay=5', '56:0', '29:0'); held = False
     wait(lambda: stack('State') == '0:0', 'nothing-copied restoration')
-    passed.append('Real ydotool Ctrl+C reached dedicated editor only after physical Ctrl+Alt release (350 ms); no Alt/Shift contamination')
+    passed.append('Ctrl+C reached the dedicated editor while Ctrl+Alt were still held; no Alt/Shift contamination')
     probe('ReadClipboard')
     wait(lambda: probe('Digest') == expected_digest, 'full-MIME original restored after no-copy')
     passed.append('Nothing-copied path retained original full-MIME clipboard without adding history items')
-    probe('ResetEvents')
-    keys('29:1', '56:1', '46:1', '46:0'); held = True
-    time.sleep(1.8)
-    assert stack('State') == '0:0', 'Modifier timeout failed'
-    assert json.loads(probe('Events')) == [], 'Timed-out shortcut synthesized a copy'
-    guard(); run('/usr/bin/ydotool', 'key', '--key-delay=5', '56:0', '29:0'); held = False
-    time.sleep(0.15)
-    assert json.loads(probe('Events')) == []
-    passed.append('Held modifiers beyond 1.5 s abort without sending a copy')
     assert stack('Count') == '0'
     # Exercise a real live stack copy/paste with a test item explicitly marked secret, so this proof also leaves
     # the user's finite clipboard history unchanged. The daemon then owns the restored original after the probe exits.

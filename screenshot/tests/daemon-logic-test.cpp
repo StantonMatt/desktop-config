@@ -9,6 +9,29 @@ using Flow = CaptureFlow;
 class DaemonLogicTest final : public QObject {
     Q_OBJECT
 private slots:
+    void shortcutKeysReleaseHeldKeysFirst() {
+        const auto events = DaemonLogic::shortcutKeyEvents(false, false);
+        const auto at = [&events](quint16 type, quint16 code, qint32 value) {
+            for (qsizetype i = 0; i < events.size(); ++i)
+                if (events[i].type == type && events[i].code == code && events[i].value == value) return i;
+            return qsizetype(-1);
+        };
+        QVERIFY(at(EV_KEY, KEY_LEFTALT, 0) >= 0 && at(EV_KEY, KEY_LEFTALT, 0) < at(EV_KEY, KEY_V, 1));
+        QVERIFY(at(EV_KEY, KEY_V, 0) < at(EV_KEY, KEY_LEFTCTRL, 1)); // a still-held V is released before the new press
+        QVERIFY(at(EV_KEY, KEY_LEFTCTRL, 1) < at(EV_KEY, KEY_V, 1));
+        QVERIFY(at(EV_KEY, KEY_V, 1) < at(EV_KEY, KEY_LEFTCTRL, 0));
+        QCOMPARE(events.last().type, quint16(EV_SYN));
+        QCOMPARE(at(EV_KEY, KEY_LEFTSHIFT, 1), qsizetype(-1));
+        const auto terminal = DaemonLogic::shortcutKeyEvents(true, true);
+        QVERIFY(std::any_of(terminal.begin(), terminal.end(), [](const auto &e) { return e.code == KEY_C && e.value == 1; }));
+        QVERIFY(std::any_of(terminal.begin(), terminal.end(), [](const auto &e) { return e.code == KEY_LEFTSHIFT && e.value == 1; }));
+        // With left Ctrl physically held, the batch uses right Ctrl, which a physical left-Ctrl release cannot clear.
+        QCOMPARE(DaemonLogic::freeModifierKey(true, KEY_LEFTCTRL, KEY_RIGHTCTRL), quint16(KEY_RIGHTCTRL));
+        QCOMPARE(DaemonLogic::freeModifierKey(false, KEY_LEFTCTRL, KEY_RIGHTCTRL), quint16(KEY_LEFTCTRL));
+        const auto right = DaemonLogic::shortcutKeyEvents(false, false, KEY_RIGHTCTRL);
+        QVERIFY(std::none_of(right.begin(), right.end(), [](const auto &e) { return e.code == KEY_LEFTCTRL; }));
+        QVERIFY(std::any_of(right.begin(), right.end(), [](const auto &e) { return e.code == KEY_RIGHTCTRL && e.value == 1; }));
+    }
     void commands() {
         QCOMPARE(parseCommand({QStringLiteral("--capture")}), Command::Capture);
         QCOMPARE(parseCommand({QStringLiteral("--daemon")}), Command::Daemon);

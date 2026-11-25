@@ -1,6 +1,7 @@
 #include "stack-controller.h"
 #include "stack-holder.h"
 #include "stack-storage.h"
+#include "daemon-logic.h"
 #include <QBuffer>
 #include <QDateTime>
 #include <QDBusConnection>
@@ -30,10 +31,13 @@ namespace {
 enum class ModifierState { Released, Held, Unavailable };
 // Closing an evdev fd waits for an RCU grace period (~16 ms each; ~450 ms for 28 devices), so device fds stay
 // open between queries. EVIOCSMASK with an empty type mask stops the kernel queueing any events for them.
-struct InputDevice { ino_t inode = 0; int fd = -1; bool keyboard = false; };
+struct InputDevice { ino_t inode = 0; int fd = -1; bool keyboard = false; bool writable = false; };
 QHash<QString, InputDevice> inputDevices;
+// The last probe's writable keyboard with a modifier held, or -1; key() writes the copy/paste keys into it.
+int heldKeyboard = -1;
 ModifierState physicalModifiers() {
     bool keyboard = false;
+    heldKeyboard = -1;
     constexpr int modifierKeys[]{KEY_LEFTCTRL, KEY_RIGHTCTRL, KEY_LEFTALT, KEY_RIGHTALT, KEY_LEFTSHIFT, KEY_RIGHTSHIFT, KEY_LEFTMETA, KEY_RIGHTMETA};
     const auto bit = [](const unsigned long *bits, int key) { return (bits[key / (8 * sizeof(long))] >> (key % (8 * sizeof(long)))) & 1UL; };
     const auto drop = [](InputDevice &device) { if (device.fd >= 0) close(device.fd); device.fd = -1; };
@@ -48,7 +52,9 @@ ModifierState physicalModifiers() {
             // New or replugged node: (re)probe it once.
             drop(device);
             device = InputDevice{info.st_ino};
-            const int fd = open(path.constData(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+            int fd = open(path.constData(), O_RDWR | O_CLOEXEC | O_NONBLOCK);
+            device.writable = fd >= 0;
+            if (fd < 0) fd = open(path.constData(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
             if (fd < 0) { device.inode = 0; continue; }
             unsigned long supported[(KEY_MAX + 8 * sizeof(long)) / (8 * sizeof(long))] = {};
             if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof supported), supported) >= 0)
@@ -73,7 +79,9 @@ ModifierState physicalModifiers() {
         }
         keyboard = true;
         for (int key : modifierKeys) {
-            if (bit(state, key)) return ModifierState::Held;
+            if (!bit(state, key)) continue;
+            if (!transient && device.writable) heldKeyboard = device.fd;
+            return ModifierState::Held;
         }
     }
     for (auto it = inputDevices.begin(); it != inputDevices.end();) {
@@ -82,6 +90,23 @@ ModifierState physicalModifiers() {
         it = inputDevices.erase(it);
     }
     return keyboard ? ModifierState::Released : ModifierState::Unavailable;
+}
+bool writeShortcutKeys(int fd, bool copy, bool shift) {
+    unsigned long state[(KEY_MAX + 8 * sizeof(long)) / (8 * sizeof(long))] = {};
+    if (ioctl(fd, EVIOCGKEY(sizeof state), state) < 0) return false;
+    const auto down = [&state](int key) { return (state[key / (8 * sizeof(long))] >> (key % (8 * sizeof(long)))) & 1UL; };
+    const auto ctrl = DaemonLogic::freeModifierKey(down(KEY_LEFTCTRL), KEY_LEFTCTRL, KEY_RIGHTCTRL);
+    const auto shiftKey = DaemonLogic::freeModifierKey(down(KEY_LEFTSHIFT), KEY_LEFTSHIFT, KEY_RIGHTSHIFT);
+    QList<input_event> events;
+    for (const auto &key : DaemonLogic::shortcutKeyEvents(copy, shift, ctrl, shiftKey)) {
+        input_event event{};
+        event.type = key.type;
+        event.code = key.code;
+        event.value = key.value;
+        events.append(event);
+    }
+    const auto bytes = qsizetype(events.size() * sizeof(input_event));
+    return write(fd, events.constData(), size_t(bytes)) == bytes;
 }
 QDBusMessage call(const QString &service, const QString &path, const QString &interface, const QString &method) {
     return QDBusMessage::createMethodCall(service, path, interface, method);
@@ -110,8 +135,9 @@ StackController::StackController(QObject *parent) : QObject(parent), clipboard(t
     grace.setSingleShot(true);
     modifiers.setInterval(15);
     connect(&modifiers, &QTimer::timeout, this, [this] {
+        if (modifiers.interval() != 15) modifiers.setInterval(15);
         const auto state = physicalModifiers();
-        if (state == ModifierState::Released) {
+        if (state == ModifierState::Released || (state == ModifierState::Held && heldKeyboard >= 0)) {
             modifiers.stop();
             if (!sameTarget() || locked()) { finish(QStringLiteral("Focus changed")); return; }
             auto next = std::move(afterModifiers);
@@ -394,7 +420,7 @@ void StackController::waitModifiers(std::function<void()> next) {
     afterModifiers = std::move(next);
     setOperation(Operation::Modifiers);
     modifierTime.start();
-    modifiers.start();
+    modifiers.start(0); // First check at once; the handler then polls every 15 ms.
 }
 void StackController::copy() {
     qInfo() << QDateTime::currentMSecsSinceEpoch() << "stack-copy-pressed";
@@ -431,12 +457,34 @@ void StackController::takeSnapshot(qint64 limit) {
     });
 }
 void StackController::key(bool copy, bool image, std::function<void()> next) {
-    if (physicalModifiers() != ModifierState::Released) {
+    const auto state = physicalModifiers();
+    const bool inject = state == ModifierState::Held && heldKeyboard >= 0;
+    if (state != ModifierState::Released && !inject) {
         if (copy) finish(QStringLiteral("Release modifier keys"));
         else restore(QStringLiteral("Release modifier keys"));
         return;
     }
     const bool shift = targetTerminal && !image;
+    if (inject) {
+        // Still holding the shortcut: write the keys into that keyboard so they need no release first.
+        qInfo().noquote() << QDateTime::currentMSecsSinceEpoch() << "stack-key" << (copy ? "copy" : "paste") << "terminal=" << targetTerminal << "image=" << image << "via=keyboard";
+        afterKeys = std::move(next);
+        keyRunning = true;
+        deadline.start(1200);
+        const bool ok = writeShortcutKeys(heldKeyboard, copy, shift);
+        QTimer::singleShot(0, this, [this, ok] {
+            if (!keyRunning) return;
+            keyRunning = false;
+            if (!ok) {
+                if (operation == Operation::Pasting) restore(QStringLiteral("Paste key failed"));
+                else finish(QStringLiteral("Copy key failed"));
+                return;
+            }
+            auto after = std::move(afterKeys);
+            if (after) after();
+        });
+        return;
+    }
     QStringList args{QStringLiteral("key"), QStringLiteral("--key-delay=5"), QStringLiteral("29:1")};
     if (shift) args << QStringLiteral("42:1");
     args << (copy ? QStringLiteral("46:1") : QStringLiteral("47:1")) << (copy ? QStringLiteral("46:0") : QStringLiteral("47:0"));
