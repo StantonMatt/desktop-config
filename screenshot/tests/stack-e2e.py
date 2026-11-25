@@ -143,14 +143,19 @@ def setting(enabled):
 def pasted(count):
     return stack('State') == f'0:{count}' and MARKER.exists() and MARKER.read_text() == f'{count}\n'
 
-def paste_text(count):
-    probe('ResetEvents'); shortcut('v')
+def paste_text(count, menu=False):
+    probe('ResetEvents')
+    if menu: stack('Paste')
+    else: shortcut('v')
     wait(lambda: len(json.loads(probe('Events'))) == 1, 'merged text received')
     wait(lambda: pasted(count), 'successful paste marker')
 
 def capture(expected):
     shortcut('s')
     wait(lambda: any(w['resourceClass'] == 'quick-region-overlay' and w['width'] == 1024 for w in json.loads(probe('Windows'))), 'stack capture overlay')
+    previous_count = stack('Count')
+    stack('Clear'); stack('Paste')
+    assert stack('Count') == previous_count, 'menu operation bypassed capture guard'
     run(str(BUILD / 'stack-input'), 'drag', '300', '300', '420', '380')
     wait(lambda: stack('Count') == str(expected), 'stack screenshot')
 
@@ -309,6 +314,7 @@ with contextlib.ExitStack() as cleanup:
     if not TERMINAL_ONLY: observe_windows()
     if os.environ.get('QRO_TRACE_POINTER') == '1':
         start('pointer-dbus', ['dbus-monitor', "member='CursorPosition'", "member='ActiveWindow'"])
+    start('stack-signals', ['dbus-monitor', "type='signal',interface='org.local.QuickRegionOverlay.Stack',member='Changed'"])
     daemon = start('daemon', [str(BUILD / 'quick-region-overlay'), '--daemon'])
     wait(lambda: stack('State'), 'daemon')
     wait(lambda: stack('Focus') == 'qro-stack-probe', 'editor focus')
@@ -460,8 +466,10 @@ with contextlib.ExitStack() as cleanup:
         setting(False); copy('OFF still appends', 5)
         setting(True); copy('ON after OFF append remains unmarked', 6)
         passed('aborted paste does not mark; live OFF appends and retires previous marker; ON resumes', count=6)
-        paste_text(6)
-        shortcut('x'); wait(lambda: stack('Count') == '0', 'clear persisted stack')
+        paste_text(6, menu=True)
+        stack('Clear'); wait(lambda: stack('Count') == '0', 'D-Bus clear persisted stack')
+        wait(lambda: 'member=Changed' in (OUT / 'stack-signals.log').read_text(), 'stack change signal')
+        passed('D-Bus Paste, Clear, Changed signal share shortcut behaviour')
         assert not MARKER.exists()
         stop(daemon)
         daemon = start('daemon-cleared', [str(BUILD / 'quick-region-overlay'), '--daemon'])

@@ -130,7 +130,7 @@ StackController::StackController(QObject *parent) : QObject(parent), clipboard(t
     directory = stateDirectory();
     cleanupClipboardHolders();
     load();
-    QDBusConnection::sessionBus().registerObject(QStringLiteral("/Stack"), this, QDBusConnection::ExportAllSlots);
+    QDBusConnection::sessionBus().registerObject(QStringLiteral("/Stack"), this, QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllSignals);
     deadline.setSingleShot(true);
     grace.setSingleShot(true);
     modifiers.setInterval(15);
@@ -274,6 +274,21 @@ StackController::~StackController() {
 void StackController::setOperation(Operation next) {
     operation = next;
     busyWheel.setBusy(next != Operation::Idle && next != Operation::Stopping);
+    notifyChanged();
+}
+void StackController::notifyChanged() {
+    const QString state = State();
+    if (state == lastPublishedState) return;
+    lastPublishedState = state;
+    emit Changed(Count(), state);
+}
+void StackController::Paste() {
+    if (captureBusy && captureBusy()) { osd(QStringLiteral("Capture busy")); return; }
+    paste();
+}
+void StackController::Clear() {
+    if (captureBusy && captureBusy()) { osd(QStringLiteral("Capture busy")); return; }
+    clear();
 }
 void StackController::shutdown() {
     if (operation == Operation::Stopping) return;
@@ -405,6 +420,7 @@ void StackController::clear() {
     items.clear();
     pasted = false;
     loadError.clear();
+    notifyChanged();
     storage.start([this, trash] {
         if (QDir(trash).exists() && !QDir(trash).removeRecursively()) qWarning() << "stack-clear-cleanup-failed" << trash;
         QMetaObject::invokeMethod(this, [this] {

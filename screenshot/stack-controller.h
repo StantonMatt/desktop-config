@@ -22,13 +22,21 @@ public:
     bool canAdd();
     void shutdown();
     static void osd(const QString &text);
+    // Menu requests share the shortcut's capture guard without changing shortcut dispatch.
+    std::function<bool()> captureBusy;
 public slots:
+    void Paste();
+    void Clear();
     void ActiveWindow(const QString &id, const QString &windowClass);
     int Count() const { return items.size(); }
     QString State() const;
     QString Focus() const { return activeClass; }
     QString FocusId() const { return activeId; }
+signals:
+    void Changed(int count, const QString &state);
 private:
+    void notifyChanged();
+    QString lastPublishedState;
     void appended(const ClipboardStack::Item &item, ClipboardStack::AddMode mode, const QString &error);
     enum class Operation { Idle, Modifiers, Copying, CopySnapshot, RestoreSnapshot, Offering, Pasting, Restoring, Stopping, Saving, PreparingImage };
     Operation operation = Operation::Idle;

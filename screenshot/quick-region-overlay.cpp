@@ -102,6 +102,7 @@ class OverlayController final : public QObject {
     Q_CLASSINFO("D-Bus Interface", "org.local.QuickRegionOverlay")
 public:
     explicit OverlayController(QObject *parent = nullptr) : QObject(parent) {
+        stack.captureBusy = [this] { return flow.busy() || flow.overlayShown(); };
         connect(qApp, &QGuiApplication::screenAdded, this, [this](QScreen *) { layoutChanged(); });
         connect(qApp, &QGuiApplication::screenRemoved, this, [this](QScreen *) { layoutChanged(); });
         pollTimer.setTimerType(Qt::PreciseTimer);
