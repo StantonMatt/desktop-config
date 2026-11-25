@@ -29,7 +29,7 @@ The clipboard stack reads held modifier keys from `/dev/input` and types copy/pa
 
 - **Ctrl+Alt+C** copies the focused app's selection and adds it to the stack. Normal Ctrl+V still pastes that last copy.
 - **Ctrl+Alt+S** freezes the screen and adds the selected region to the stack and clipboard. Print and Meta+Shift+S copy a region without adding it.
-- **Ctrl+Alt+V** pastes the stack, oldest first, then restores the previous clipboard with all its formats. Pasting keeps the stack.
+- **Ctrl+Alt+V** pastes the stack, oldest first, then restores the previous clipboard with all its formats, except that an image offered as PNG is kept only as PNG: other image encodings (Qt offers about 38, each encoded on request) would take over a second to read. The same applies to images copied with Ctrl+Alt+C. Pasting keeps the stack.
 - **Ctrl+Alt+X** clears the stack.
 
 By default, after a successful stack paste, the next successful copy or stack screenshot starts a new stack containing just that item (OSD: “New stack: 1 item”). You can paste the same stack repeatedly until then. A failed or empty copy leaves the previous stack intact; an aborted paste does not mark it as pasted. Clearing removes both items and the marker.

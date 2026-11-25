@@ -36,6 +36,18 @@ inline Kind kind(const Item &item) {
     }
     return text && !files ? Kind::Text : Kind::Other;
 }
+// Qt image offers list ~38 encodings (HEIF, AVIF, EXR, ...) produced on request, which takes seconds to read.
+// PNG is lossless and universally accepted, so when it is offered the other image encodings are not read.
+inline QStringList snapshotFormats(const QStringList &formats) {
+    if (!formats.contains(QStringLiteral("image/png"))) return formats;
+    QStringList kept;
+    for (const QString &format : formats) {
+        const bool otherImage = format != QLatin1String("image/png")
+            && (format.startsWith(QLatin1String("image/")) || format == QLatin1String("application/x-qt-image"));
+        if (!otherImage) kept << format;
+    }
+    return kept;
+}
 // A selection can offer formats with zero bytes; that is nothing to stack.
 inline bool hasPayload(const Item &item) {
     return std::any_of(item.cbegin(), item.cend(), [](const QByteArray &bytes) { return !bytes.isEmpty(); });

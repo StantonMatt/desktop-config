@@ -169,7 +169,7 @@ public:
             emit api->snapshotReady(serial, error.isEmpty() ? read->item : ClipboardStack::Item{}, error);
             read->deleteLater();
         };
-        const auto formats = offers.value(selection);
+        const auto formats = ClipboardStack::snapshotFormats(offers.value(selection));
         if (formats.size() > 4096) { finish(QStringLiteral("Too many clipboard formats")); return; }
         read->remaining = formats.size();
         if (formats.isEmpty()) { finish({}); return; }

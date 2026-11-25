@@ -98,6 +98,9 @@ private slots:
         if (previous.isNull()) qunsetenv("XDG_STATE_HOME"); else qputenv("XDG_STATE_HOME", previous);
     }
     void classification() {
+        QCOMPARE(snapshotFormats({QStringLiteral("application/x-qt-image"), QStringLiteral("image/avif"), QStringLiteral("image/png"), QStringLiteral("text/html"), QStringLiteral("image/heif")}),
+                 QStringList({QStringLiteral("image/png"), QStringLiteral("text/html")}));
+        QCOMPARE(snapshotFormats({QStringLiteral("image/jpeg"), QStringLiteral("text/plain")}), QStringList({QStringLiteral("image/jpeg"), QStringLiteral("text/plain")}));
         QVERIFY(!hasPayload({{QStringLiteral("text/plain"), QByteArray()}, {QStringLiteral("UTF8_STRING"), QByteArray()}}));
         QVERIFY(hasPayload({{QStringLiteral("text/plain"), QByteArray()}, {QStringLiteral("text/html"), "<b></b>"}}));
         QCOMPARE(kind({{QStringLiteral("text/plain"), "hi"}, {QStringLiteral("text/html"), "<b>hi</b>"}}), Kind::Text);
