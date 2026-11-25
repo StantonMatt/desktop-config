@@ -1,5 +1,6 @@
 #include "stack-controller.h"
 #include "stack-holder.h"
+#include "stack-storage.h"
 #include <QBuffer>
 #include <QDBusConnection>
 #include <QDBusMessage>
@@ -8,12 +9,16 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
+#include <QSet>
 #include <QImage>
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QUuid>
 #include <linux/input.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <cerrno>
 #include <fcntl.h>
 #include <unistd.h>
 #include <limits>
@@ -22,26 +27,58 @@ using namespace ClipboardStack;
 namespace {
 // EVIOCGKEY is a state query, not an event reader: no keystrokes are collected or retained.
 enum class ModifierState { Released, Held, Unavailable };
+// Closing an evdev fd waits for an RCU grace period (~16 ms each; ~450 ms for 28 devices), so device fds stay
+// open between queries. EVIOCSMASK with an empty type mask stops the kernel queueing any events for them.
+struct InputDevice { ino_t inode = 0; int fd = -1; bool keyboard = false; };
+QHash<QString, InputDevice> inputDevices;
 ModifierState physicalModifiers() {
     bool keyboard = false;
     constexpr int modifierKeys[]{KEY_LEFTCTRL, KEY_RIGHTCTRL, KEY_LEFTALT, KEY_RIGHTALT, KEY_LEFTSHIFT, KEY_RIGHTSHIFT, KEY_LEFTMETA, KEY_RIGHTMETA};
     const auto bit = [](const unsigned long *bits, int key) { return (bits[key / (8 * sizeof(long))] >> (key % (8 * sizeof(long)))) & 1UL; };
+    const auto drop = [](InputDevice &device) { if (device.fd >= 0) close(device.fd); device.fd = -1; };
+    QSet<QString> present;
     for (const auto &name : QDir(QStringLiteral("/dev/input")).entryList({QStringLiteral("event*")}, QDir::System)) {
-        const int fd = open(QFile::encodeName(QStringLiteral("/dev/input/") + name).constData(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
-        if (fd < 0) continue;
-        unsigned long supported[(KEY_MAX + 8 * sizeof(long)) / (8 * sizeof(long))] = {};
-        unsigned long state[(KEY_MAX + 8 * sizeof(long)) / (8 * sizeof(long))] = {};
-        bool relevant = false;
-        if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof supported), supported) >= 0)
-            for (int key : modifierKeys) relevant = relevant || bit(supported, key);
-        if (relevant) {
-            if (ioctl(fd, EVIOCGKEY(sizeof state), state) < 0) { close(fd); return ModifierState::Unavailable; }
-            keyboard = true;
-            for (int key : modifierKeys) {
-                if (bit(state, key)) { close(fd); return ModifierState::Held; }
-            }
+        const QByteArray path = QFile::encodeName(QStringLiteral("/dev/input/") + name);
+        struct stat info {};
+        if (stat(path.constData(), &info) != 0) continue;
+        present.insert(name);
+        auto &device = inputDevices[name];
+        if (device.inode != info.st_ino) {
+            // New or replugged node: (re)probe it once.
+            drop(device);
+            device = InputDevice{info.st_ino};
+            const int fd = open(path.constData(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+            if (fd < 0) { device.inode = 0; continue; }
+            unsigned long supported[(KEY_MAX + 8 * sizeof(long)) / (8 * sizeof(long))] = {};
+            if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof supported), supported) >= 0)
+                for (int key : modifierKeys) device.keyboard = device.keyboard || bit(supported, key);
+            unsigned long noTypes[(EV_MAX + 8 * sizeof(long)) / (8 * sizeof(long))] = {};
+            input_mask mask{0, sizeof noTypes, quint64(reinterpret_cast<quintptr>(noTypes))};
+            if (device.keyboard && ioctl(fd, EVIOCSMASK, &mask) >= 0) device.fd = fd;
+            else close(fd); // Not a keyboard, or events could not be masked: never hold it open.
         }
-        close(fd);
+        if (!device.keyboard) continue;
+        int fd = device.fd;
+        const bool transient = fd < 0;
+        if (transient) fd = open(path.constData(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+        if (fd < 0) { device.inode = 0; continue; }
+        unsigned long state[(KEY_MAX + 8 * sizeof(long)) / (8 * sizeof(long))] = {};
+        const bool ok = ioctl(fd, EVIOCGKEY(sizeof state), state) >= 0;
+        const int error = errno;
+        if (transient) close(fd);
+        if (!ok) {
+            if (error == ENODEV) { drop(device); device.inode = 0; continue; }
+            return ModifierState::Unavailable;
+        }
+        keyboard = true;
+        for (int key : modifierKeys) {
+            if (bit(state, key)) return ModifierState::Held;
+        }
+    }
+    for (auto it = inputDevices.begin(); it != inputDevices.end();) {
+        if (present.contains(it.key())) { ++it; continue; }
+        drop(it.value());
+        it = inputDevices.erase(it);
     }
     return keyboard ? ModifierState::Released : ModifierState::Unavailable;
 }
@@ -126,6 +163,10 @@ StackController::StackController(QObject *parent) : QObject(parent), clipboard(t
         if (id != serial) return;
         if (operation == Operation::Restoring) {
             if (ok) restorePending = false;
+            if (ok && pasteSucceeded) {
+                if (savePasteMarker(directory, items.size())) pasted = true;
+                else { finish(completion + QStringLiteral("; cannot save stack marker")); return; }
+            }
             finish(ok ? completion : QStringLiteral("Clipboard restore failed")); return;
         }
         if (operation != Operation::Offering) return;
@@ -212,11 +253,7 @@ void StackController::osd(const QString &text) {
     QDBusConnection::sessionBus().asyncCall(message, 500);
 }
 void StackController::load() {
-    const QDir parent(QFileInfo(directory).absolutePath());
-    for (const auto &name : parent.entryList({QStringLiteral("stack-cleared-*")}, QDir::Dirs | QDir::NoDotAndDotDot)) {
-        if (!QUuid(name.mid(14)).isNull() && !QFileInfo(parent.filePath(name)).isSymLink())
-            QDir(parent.filePath(name)).removeRecursively(); // Finish a clear interrupted after its atomic rename.
-    }
+    cleanupRetiredStacks(directory);
     const QDir dir(directory);
     const auto files = dir.entryList({QStringLiteral("*.qrs")}, QDir::Files, QDir::Name);
     if (files.size() > maxItems) { loadError = QStringLiteral("Stack storage invalid; clear it"); return; }
@@ -228,6 +265,7 @@ void StackController::load() {
         items << item;
     }
     if (!loadError.isEmpty()) items.clear();
+    pasted = hasPasteMarker(directory, items.size());
 }
 bool StackController::available() {
     if (busy()) { osd(QStringLiteral("Stack busy")); return false; }
@@ -237,13 +275,25 @@ bool StackController::available() {
 }
 void StackController::append(const Item &item) {
     if (!loadError.isEmpty()) { osd(loadError); return; }
-    if (items.size() >= maxItems) { osd(QStringLiteral("Stack full (100 items)")); return; }
+    const auto mode = addMode(items.size(), pasted, newStackAfterPaste());
+    if (mode == AddMode::Full) { osd(QStringLiteral("Stack full (100 items)")); return; }
+    if (!hasPayload(item)) { osd(QStringLiteral("Nothing copied")); return; }
     if (size(item) > maxBytes) { osd(QStringLiteral("Item exceeds 64 MB")); return; }
-    if (!QDir().mkpath(directory) || !QFile::setPermissions(directory, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner)) { osd(QStringLiteral("Cannot save stack")); return; }
-    QSaveFile file(directory + QStringLiteral("/%1.qrs").arg(items.size(), 3, 10, QLatin1Char('0')));
-    const auto bytes = encode(item);
-    if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner | QFile::WriteOwner) || file.write(bytes) != bytes.size() || !file.commit()) { osd(QStringLiteral("Cannot save stack")); return; }
+    if (mode == AddMode::Replace) {
+        const QString staged = stageStackReplacement(directory, item);
+        if (staged.isEmpty()) { osd(QStringLiteral("Cannot save stack")); return; }
+        const bool committed = exchangeStackDirectories(directory, staged);
+        if (!QDir(staged).removeRecursively()) qWarning() << "stack-replace-cleanup-failed" << staged;
+        if (!committed) { osd(QStringLiteral("Cannot replace stack")); return; }
+        items = {item};
+        pasted = false;
+        osd(QStringLiteral("New stack: 1 item"));
+        return;
+    }
+    if (!saveStackItem(directory, items.size(), item)) { osd(QStringLiteral("Cannot save stack")); return; }
     items << item;
+    pasted = false;
+    QFile::remove(directory + QStringLiteral("/pasted")); // Count mismatch already invalidates it durably.
     osd(items.size() == 1 ? QStringLiteral("Stack: 1 item") : QStringLiteral("Stack: %1 items").arg(items.size()));
 }
 void StackController::appendImage(const QImage &image) {
@@ -259,6 +309,7 @@ void StackController::clear() {
     const QString trash = directory + QStringLiteral("-cleared-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
     if (QDir(directory).exists() && !QDir().rename(directory, trash)) { osd(QStringLiteral("Cannot clear stack")); return; }
     items.clear();
+    pasted = false;
     loadError.clear();
     if (QDir(trash).exists() && !QDir(trash).removeRecursively()) qWarning() << "stack-clear-cleanup-failed" << trash;
     osd(QStringLiteral("Stack cleared"));
@@ -274,8 +325,7 @@ void StackController::waitModifiers(std::function<void()> next) {
     modifiers.start();
 }
 void StackController::copy() {
-    if (!available()) return;
-    if (items.size() >= maxItems) { osd(QStringLiteral("Stack full (100 items)")); return; }
+    if (!canAdd()) return;
     waitModifiers([this] {
         operation = Operation::Copying;
         copyChanged = false;
@@ -287,6 +337,7 @@ void StackController::copy() {
 void StackController::paste() {
     if (!available()) return;
     if (items.isEmpty()) { osd(QStringLiteral("Stack empty")); return; }
+    pasteSucceeded = false;
     waitModifiers([this] { operation = Operation::RestoreSnapshot; takeSnapshot(std::numeric_limits<qint64>::max()); });
 }
 void StackController::takeSnapshot(qint64 limit) {
@@ -321,8 +372,8 @@ void StackController::releaseSyntheticKeys() {
     QTimer::singleShot(1000, this, [this] { if (releaseKeys.state() != QProcess::NotRunning) releaseKeys.kill(); });
 }
 void StackController::nextPaste() {
-    if (pasteIndex >= pasteItems.size()) { restore(QStringLiteral("Pasted %1 items").arg(items.size())); return; }
     if (!sameTarget() || locked()) { restore(QStringLiteral("Focus changed")); return; }
+    if (pasteIndex >= pasteItems.size()) { pasteSucceeded = true; restore(QStringLiteral("Pasted %1 items").arg(items.size())); return; }
     auto item = pasteItems[pasteIndex];
     item.insert(secretHint, QByteArrayLiteral("secret"));
     operation = Operation::Offering;
@@ -338,6 +389,14 @@ void StackController::restore(const QString &message) {
 void StackController::finish(const QString &message) {
     modifiers.stop(); deadline.stop(); grace.stop();
     operation = Operation::Idle;
+    pasteSucceeded = false;
     pasteItems.clear(); if (!restorePending) original.clear(); afterKeys = {}; afterModifiers = {};
     osd(message);
+}
+bool StackController::canAdd() {
+    if (!available()) return false;
+    if (addMode(items.size(), pasted, newStackAfterPaste()) == AddMode::Full) {
+        osd(QStringLiteral("Stack full (100 items)")); return false;
+    }
+    return true;
 }

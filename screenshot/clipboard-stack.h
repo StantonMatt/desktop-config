@@ -18,6 +18,11 @@ namespace ClipboardStack {
 using Item = QMap<QString, QByteArray>;
 inline constexpr qsizetype maxItems = 100;
 inline constexpr qint64 maxBytes = 64LL * 1024 * 1024;
+enum class AddMode { Append, Replace, Full };
+inline AddMode addMode(qsizetype count, bool pasted, bool newStackAfterPaste) {
+    if (pasted && newStackAfterPaste) return AddMode::Replace;
+    return count >= maxItems ? AddMode::Full : AddMode::Append;
+}
 inline const QString secretHint = QStringLiteral("x-kde-passwordManagerHint");
 inline QString stateDirectory() { return QStandardPaths::writableLocation(QStandardPaths::GenericStateLocation) + QStringLiteral("/quick-region-overlay/stack"); }
 enum class Kind { Text, Image, Other };
@@ -30,6 +35,10 @@ inline Kind kind(const Item &item) {
         if (format.section(QLatin1Char(';'), 0, 0) == QLatin1String("text/plain") || format == QLatin1String("utf8_string")) text = true;
     }
     return text && !files ? Kind::Text : Kind::Other;
+}
+// A selection can offer formats with zero bytes; that is nothing to stack.
+inline bool hasPayload(const Item &item) {
+    return std::any_of(item.cbegin(), item.cend(), [](const QByteArray &bytes) { return !bytes.isEmpty(); });
 }
 inline qint64 size(const Item &item) {
     qint64 result = 0;

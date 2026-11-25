@@ -17,6 +17,7 @@ public:
     void paste();
     void clear();
     void appendImage(const QImage &image);
+    bool canAdd();
     void shutdown();
     static void osd(const QString &text);
 public slots:
@@ -32,6 +33,7 @@ private:
     QList<ClipboardStack::Item> items, pasteItems;
     ClipboardStack::Item original;
     bool restorePending = false;
+    bool pasted = false, pasteSucceeded = false;
     QString directory, loadError, activeId, activeClass, targetId;
     bool targetTerminal = false, targetLeft = false, copyChanged = false, keyRunning = false, readSeen = false;
     quint64 serial = 0;

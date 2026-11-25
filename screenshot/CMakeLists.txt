@@ -18,7 +18,7 @@ add_custom_command(OUTPUT ext-data-control-v1-protocol.c
     COMMAND ${WAYLAND_SCANNER} private-code ${CMAKE_CURRENT_SOURCE_DIR}/ext-data-control-v1.xml ${CMAKE_CURRENT_BINARY_DIR}/ext-data-control-v1-protocol.c
     DEPENDS ext-data-control-v1.xml)
 add_executable(quick-region-overlay quick-region-overlay.cpp selection-geometry.h capture-checks.h daemon-logic.h
-    clipboard-stack.h stack-controller.h stack-controller.cpp stack-clipboard.h stack-clipboard.cpp stack-holder.h stack-holder.cpp
+    clipboard-stack.h stack-storage.h stack-controller.h stack-controller.cpp stack-clipboard.h stack-clipboard.cpp stack-holder.h stack-holder.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/ext-data-control-v1-client-protocol.h ${CMAKE_CURRENT_BINARY_DIR}/ext-data-control-v1-protocol.c)
 target_include_directories(quick-region-overlay PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(quick-region-overlay PRIVATE Qt6::Core Qt6::Gui Qt6::DBus Qt6::Widgets LayerShellQt::Interface KF6::GuiAddons KF6::GlobalAccel PkgConfig::WaylandClient)
@@ -34,7 +34,7 @@ add_test(NAME capture-checks COMMAND capture-checks-test)
 add_executable(daemon-logic-test tests/daemon-logic-test.cpp daemon-logic.h)
 target_link_libraries(daemon-logic-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
 add_test(NAME daemon-logic COMMAND daemon-logic-test)
-add_executable(clipboard-stack-test tests/clipboard-stack-test.cpp clipboard-stack.h)
+add_executable(clipboard-stack-test tests/clipboard-stack-test.cpp clipboard-stack.h stack-storage.h)
 target_link_libraries(clipboard-stack-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
 add_test(NAME clipboard-stack COMMAND clipboard-stack-test)
 add_test(NAME scripts COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check-scripts.sh)

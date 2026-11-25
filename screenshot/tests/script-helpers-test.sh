@@ -4,6 +4,7 @@
 set -euo pipefail
 source_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 HOME=$(mktemp -d)
+export XDG_CONFIG_HOME="$HOME/.config"
 trap 'rm -rf -- "$HOME"' EXIT
 # shellcheck source=../shortcut-lib.sh
 source "$source_dir/shortcut-lib.sh"
@@ -26,6 +27,59 @@ check_status() { # description, exact expected status, command...
 expect() { # description, expected output, actual output
     [[ $3 == "$2" ]] || { echo "FAIL: $1 (got '$3', expected '$2')"; failures=$((failures + 1)); }
 }
+
+# Real KConfig tools, private config and home only. Stub just the reload transport, never the settings I/O.
+(
+    state_dir="$HOME/klipper-state"
+    mkdir -p "$state_dir"
+    reload_klipper_settings() { :; }
+    mkdir -p "$HOME/system-config"
+    printf '[General]\nMaxClipItems=23\nIgnoreImages=true\n' >"$HOME/system-config/klipperrc"
+    expect 'inherited length remains an absent user key' null "$(XDG_CONFIG_DIRS="$HOME/system-config" klipper_value_json MaxClipItems)"
+    install_klipper_settings
+    expect 'absent history length is installed' 40 "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems)"
+    expect 'absent image preference is installed' false "$(kreadconfig6 --file klipperrc --group General --key IgnoreImages)"
+    install_klipper_settings
+    expect 'rerun retains absent original' null "$(jq -r '.values.MaxClipItems' "$state_dir/klipper-settings.json")"
+    restore_klipper_settings
+    expect 'rollback removes absent length' absent "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems --default absent)"
+    expect 'rollback removes absent image preference' absent "$(kreadconfig6 --file klipperrc --group General --key IgnoreImages --default absent)"
+    restore_klipper_settings
+    kwriteconfig6 --file klipperrc --group General --key MaxClipItems 17
+    kwriteconfig6 --file klipperrc --group General --key IgnoreImages true
+    kwriteconfig6 --file klipperrc --group General --key Unrelated untouched
+    install_klipper_settings
+    install_klipper_settings
+    expect 'rerun retains original custom length' 17 "$(jq -r '.values.MaxClipItems' "$state_dir/klipper-settings.json")"
+    expect 'record is private' 600 "$(stat -c %a "$state_dir/klipper-settings.json")"
+    restore_klipper_settings
+    expect 'rollback restores custom length' 17 "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems)"
+    expect 'rollback restores custom image preference' true "$(kreadconfig6 --file klipperrc --group General --key IgnoreImages)"
+    expect 'unrelated Klipper settings survive' untouched "$(kreadconfig6 --file klipperrc --group General --key Unrelated)"
+    kwriteconfig6 --file klipperrc --group General --key MaxClipItems 55
+    restore_klipper_settings
+    expect 'second rollback keeps later user change' 55 "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems)"
+    kwriteconfig6 --file klipperrc --group General --key MaxClipItems __qro_absent_1__
+    expect 'sentinel-like values are present values' '"__qro_absent_1__"' "$(klipper_value_json MaxClipItems)"
+    printf 'not json\n' >"$state_dir/klipper-settings.json"
+    check 'corrupt settings record is refused' 1 install_klipper_settings
+    exit $((failures > 0))
+) || { echo 'FAIL: Klipper install and rollback settings'; failures=$((failures + 1)); }
+# D-Bus reload is only sent to a running Klipper and never restarts plasmashell or activates a missing Klipper.
+(
+    busctl() {
+        printf '%s\n' "$*" >>"$HOME/klipper-bus-calls"
+        [[ $* != *NameHasOwner* ]] || printf 'b %s\n' "$klipper_running"
+    }
+    klipper_running=true
+    reload_klipper_settings
+    expect 'live reload method and no activation' '--user --timeout=3 --auto-start=no call org.kde.klipper /klipper org.kde.klipper.klipper reloadConfig' "$(tail -1 "$HOME/klipper-bus-calls")"
+    : >"$HOME/klipper-bus-calls"
+    klipper_running=false
+    reload_klipper_settings >/dev/null
+    expect 'missing Klipper only checks ownership' 1 "$(wc -l <"$HOME/klipper-bus-calls")"
+    exit $((failures > 0))
+) || { echo 'FAIL: Klipper reload transport'; failures=$((failures + 1)); }
 stub_owners=
 key_owners() { printf "%s" "$stub_owners"; }
 

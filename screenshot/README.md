@@ -14,7 +14,7 @@ Meta+Shift+S and Print freeze the screen and copy a dragged region to the clipbo
 Install the dependencies, then clone and run the installer:
 
 ```sh
-sudo apt install git build-essential cmake pkg-config libwayland-dev libwayland-bin qt6-base-dev qt6-wayland libkf6guiaddons-dev liblayershellqtinterface-dev libkf6globalaccel-dev qdbus-qt6 libkf6service-bin kde-spectacle ydotool jq coreutils gawk sed grep perl util-linux systemd dbus-user-session
+sudo apt install git build-essential cmake pkg-config libwayland-dev libwayland-bin qt6-base-dev qt6-wayland libkf6guiaddons-dev liblayershellqtinterface-dev libkf6globalaccel-dev libkf6config-bin qdbus-qt6 libkf6service-bin kde-spectacle ydotool jq coreutils gawk sed grep perl util-linux systemd dbus-user-session
 git clone https://github.com/StantonMatt/desktop-config.git
 sudo usermod -aG input "$USER"   # then log out and back in
 systemctl --user enable --now ydotool.service
@@ -32,9 +32,22 @@ The clipboard stack reads held modifier keys from `/dev/input` and types copy/pa
 - **Ctrl+Alt+V** pastes the stack, oldest first, then restores the previous clipboard with all its formats. Pasting keeps the stack.
 - **Ctrl+Alt+X** clears the stack.
 
+By default, after a successful stack paste, the next successful copy or stack screenshot starts a new stack containing just that item (OSD: “New stack: 1 item”). You can paste the same stack repeatedly until then. A failed or empty copy leaves the previous stack intact; an aborted paste does not mark it as pasted. Clearing removes both items and the marker.
+
+To keep appending after pasting, or enable the default behavior again:
+
+```sh
+kwriteconfig6 --file quick-region-overlayrc --group Stack --key NewStackAfterPaste false
+kwriteconfig6 --file quick-region-overlayrc --group Stack --key NewStackAfterPaste true
+```
+
+The daemon reads `[Stack] NewStackAfterPaste` in `~/.config/quick-region-overlayrc` (or `$XDG_CONFIG_HOME/quick-region-overlayrc`) on every add; no restart is needed. Install never writes this setting. Successful pastes record a marker even with the setting off, so enabling it after a paste can start a new stack. A successful add with the setting off appends and retires that marker.
+
 Consecutive text items paste together with one line break between them. Rich-text runs also offer HTML, with plain text escaped. Images and files paste individually; no separators are inserted around them. An item offering `image/*` is an image. Otherwise, an item offering plain text (including charset variants and `UTF8_STRING`) is text unless it also offers a file URI list. Everything else is pasted separately. A single text item keeps every original format; a merged run offers only the joined plain text and HTML, omitting auxiliary ODT, markdown and browser formats. The receiving app decides which formats it accepts.
 
 Short Plasma OSD messages show the item count or an error. The stack survives daemon restarts and reboots in `~/.local/state/quick-region-overlay/stack/`, with owner-only directory and file permissions. It holds up to 100 items, at most 64 MiB each across the offered formats; additions over either cap are refused. Clear it when finished with sensitive material. Rollback retains stack data; clear it first if you want the data removed.
+
+The private `stack/pasted` file records the successfully pasted item count. Starting a new stack first saves its new item in a private sibling directory, then atomically exchanges it with the old stack using Linux `renameat2(RENAME_EXCHANGE)`. A process crash leaves either the entire old stack and marker or the new one-item stack, and startup removes interrupted staging/cleanup directories. Filesystems without directory exchange refuse the replacement and retain the old stack. A full pasted stack can still start a new stack; the 100-item limit applies to appending.
 
 Copy/paste requires `ydotool`, its active user service (`systemctl --user enable --now ydotool.service`), and readable keyboard devices in `/dev/input` (membership in the `input` group, effective after logging out and back in). The daemon queries modifier state without reading or recording key events. Release Ctrl/Alt/Shift/Meta within 1.5 seconds; otherwise it aborts with an OSD. KWin's active-window script selects Ctrl+Shift+C/V for recognised terminal emulators, with Ctrl+V for terminal images. If window detection is unavailable, it uses normal Ctrl+C/V. A focus change during an operation stops further input.
 
@@ -43,6 +56,8 @@ Stack paste offers carry `x-kde-passwordManagerHint=secret`, which Klipper honou
 Stopping or restarting the daemon preserves a clipboard it owns through the stack transport. It saves the original clipboard during a paste, or the current offer after a paste, to a private `clipboard-holder-*.qrs` file in `~/.local/state/quick-region-overlay/`, then starts the same binary with `--hold-clipboard` in an independent transient user service (`qro-clipboard-holder-*`). The holder confirms ownership before the daemon exits, removes the snapshot, and serves the exact formats until another app copies or the session ends. It does not register shortcuts or the daemon's D-Bus name. Handoff waits up to three seconds; a failure is logged and the snapshot is retained for recovery. Startup removes holder snapshots older than one day. This covers orderly stops (including reinstall); a forced kill or crash cannot hand off an in-memory clipboard.
 
 The exact-byte stack transport uses Wayland's `ext_data_control_v1`; Qt/KSystemClipboard's image-serving path re-encodes images. Its protocol XML is an unchanged copy from [wayland-protocols 1.47](https://github.com/wayland-mirror/wayland-protocols/blob/1.47/staging/ext-data-control/ext-data-control-v1.xml) (license in the file). Build dependencies additionally include `pkg-config`, `libwayland-dev` and `libwayland-bin`. Install checks these, ydotool and keyboard access before changing desktop files or shortcuts.
+
+The installer sets Plasma clipboard history (`klipperrc`, `[General]`) to `MaxClipItems=40` and `IgnoreImages=false`, so screenshots enter history. It records each previous value, including absent keys, in `~/.local/state/quick-region-overlay/klipper-settings.json`; reinstall preserves that original record until a completed rollback. Rollback restores the values or removes originally absent keys. Both scripts call Klipper's D-Bus `reloadConfig()` when it is running; this applies the settings live without restarting plasmashell (Plasma 6.3 or newer). If Klipper is stopped, the settings apply when it starts. Reducing a history limit can discard older entries; restoring the limit cannot recreate them.
 
 ## Install details and roll back
 

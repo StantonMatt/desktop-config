@@ -16,9 +16,9 @@ trap on_exit EXIT
 
 # Check dependencies before creating state or changing the desktop. The same complete command is printed for a
 # missing tool, header/CMake package or compiler; configure diagnostics remain visible.
-apt_line='sudo apt install git build-essential cmake pkg-config libwayland-dev libwayland-bin qt6-base-dev qt6-wayland libkf6guiaddons-dev liblayershellqtinterface-dev libkf6globalaccel-dev qdbus-qt6 libkf6service-bin kde-spectacle ydotool jq coreutils gawk sed grep perl util-linux systemd dbus-user-session'
+apt_line='sudo apt install git build-essential cmake pkg-config libwayland-dev libwayland-bin qt6-base-dev qt6-wayland libkf6guiaddons-dev liblayershellqtinterface-dev libkf6globalaccel-dev libkf6config-bin qdbus-qt6 libkf6service-bin kde-spectacle ydotool jq coreutils gawk sed grep perl util-linux systemd dbus-user-session'
 missing_dependency() { printf '%s\n%s\n' "$1" "$apt_line" >&2; exit 1; }
-for tool in dpkg-query cmake c++ make qdbus6 busctl jq kbuildsycoca6 spectacle systemctl systemd-run cmp perl flock \
+for tool in dpkg-query cmake c++ make qdbus6 busctl jq kreadconfig6 kwriteconfig6 kbuildsycoca6 spectacle systemctl systemd-run cmp perl flock \
     sha256sum awk sed install stat paste date cat mkdir mktemp cp mv rm dirname sleep grep ydotool wayland-scanner pkg-config; do
     command -v "$tool" >/dev/null || missing_dependency "Missing tool: $tool. Install dependencies with:"
 done
@@ -32,6 +32,7 @@ for package in qt6-base-dev qt6-wayland libkf6guiaddons-dev liblayershellqtinter
         missing_dependency "Missing dependency: $package. Install dependencies with:"
 done
 take_lock
+validate_klipper_record
 work=$(mkdir -p "$scratch" && mktemp -d "$scratch/overlay-install.XXXXXX")
 cmake -S "$source_dir" -B "$work/cmake" -DCMAKE_BUILD_TYPE=Release >"$work/configure.log" 2>&1 || {
     cat "$work/configure.log" >&2
@@ -95,6 +96,7 @@ if [[ $record_fresh == 1 ]]; then
     mv -- "$fresh_file.tmp" "$fresh_file"
 fi
 recover=$(rollback_command "$rollback_mode")
+install_klipper_settings
 # A recorded mode outlives its handover only after an interruption between the two writes that complete it.
 marker_pending "$handover_state" || rm -f -- "$mode_file"
 changed=0

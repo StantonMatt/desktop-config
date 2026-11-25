@@ -1,9 +1,93 @@
 #include "../clipboard-stack.h"
+#include "../stack-storage.h"
+#include <QProcess>
+#include <QScopeGuard>
+#include <QTemporaryDir>
 #include <QTest>
+#include <sys/wait.h>
 using namespace ClipboardStack;
 class ClipboardStackTest final : public QObject {
     Q_OBJECT
 private slots:
+    void newStackDecisions() {
+        for (bool enabled : {false, true}) {
+            for (bool pasted : {false, true}) {
+                const bool replace = enabled && pasted;
+                QCOMPARE(addMode(3, pasted, enabled), replace ? AddMode::Replace : AddMode::Append);
+                QCOMPARE(addMode(maxItems, pasted, enabled), replace ? AddMode::Replace : AddMode::Full);
+            }
+        }
+    }
+    void liveIniSetting() {
+        QTemporaryDir config;
+        QVERIFY(config.isValid());
+        const auto previous = qgetenv("XDG_CONFIG_HOME");
+        const auto restore = qScopeGuard([&] { if (previous.isNull()) qunsetenv("XDG_CONFIG_HOME"); else qputenv("XDG_CONFIG_HOME", previous); });
+        qputenv("XDG_CONFIG_HOME", config.path().toUtf8());
+        QVERIFY(newStackAfterPaste());
+        for (const QString &value : {QStringLiteral("false"), QStringLiteral("true"), QStringLiteral("false")}) {
+            QCOMPARE(QProcess::execute(QStringLiteral("kwriteconfig6"), {QStringLiteral("--file"), QStringLiteral("quick-region-overlayrc"),
+                QStringLiteral("--group"), QStringLiteral("Stack"), QStringLiteral("--key"), QStringLiteral("NewStackAfterPaste"), value}), 0);
+            QCOMPARE(newStackAfterPaste(), value == QLatin1String("true"));
+        }
+    }
+    void interruptedStackReplacement() {
+        const Item old{{QStringLiteral("text/plain"), "old"}}, added{{QStringLiteral("image/png"), QByteArray::fromHex("00ff0102")}};
+        for (bool commit : {false, true}) {
+            QTemporaryDir scratch;
+            QVERIFY(scratch.isValid());
+            const QString directory = scratch.path() + QStringLiteral("/stack");
+            QVERIFY(saveStackItem(directory, 0, old));
+            QVERIFY(saveStackItem(directory, 1, old));
+            QVERIFY(savePasteMarker(directory, 2));
+            const auto child = fork();
+            QVERIFY(child >= 0);
+            if (child == 0) {
+                const auto staged = stageStackReplacement(directory, added);
+                if (staged.isEmpty() || (commit && !exchangeStackDirectories(directory, staged))) _exit(2);
+                _exit(0); // Simulate death without destructors before/after the atomic commit point.
+            }
+            int status = 0;
+            QCOMPARE(waitpid(child, &status, 0), child);
+            QVERIFY(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+            cleanupRetiredStacks(directory);
+            QCOMPARE(QDir(scratch.path()).entryList(QDir::Dirs | QDir::NoDotAndDotDot), QStringList{QStringLiteral("stack")});
+            QCOMPARE(QDir(directory).entryList({QStringLiteral("*.qrs")}, QDir::Files).size(), commit ? 1 : 2);
+            QCOMPARE(hasPasteMarker(directory, commit ? 1 : 2), !commit);
+            QFile file(directory + QStringLiteral("/000.qrs"));
+            QVERIFY(file.open(QIODevice::ReadOnly));
+            Item loaded;
+            QVERIFY(decode(file.readAll(), loaded));
+            QCOMPARE(loaded, commit ? added : old);
+            QCOMPARE(QFileInfo(directory).permissions() & (QFile::ReadGroup | QFile::WriteGroup | QFile::ExeGroup | QFile::ReadOther | QFile::WriteOther | QFile::ExeOther), QFile::Permissions{});
+            QCOMPARE(file.permissions() & (QFile::ReadGroup | QFile::WriteGroup | QFile::ExeGroup | QFile::ReadOther | QFile::WriteOther | QFile::ExeOther), QFile::Permissions{});
+        }
+    }
+    void failedReplacementAndStaleMarker() {
+        QTemporaryDir scratch;
+        QVERIFY(scratch.isValid());
+        const QString directory = scratch.path() + QStringLiteral("/stack");
+        const Item old{{QStringLiteral("text/plain"), "old"}};
+        QVERIFY(saveStackItem(directory, 0, old));
+        QVERIFY(savePasteMarker(directory, 1));
+        QVERIFY(QFile::setPermissions(scratch.path(), QFile::ReadOwner | QFile::ExeOwner));
+        const auto failedStage = stageStackReplacement(directory, old);
+        QVERIFY(QFile::setPermissions(scratch.path(), QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+        QVERIFY(failedStage.isEmpty());
+        QVERIFY(hasPasteMarker(directory, 1));
+        QVERIFY(!exchangeStackDirectories(directory, scratch.path() + QStringLiteral("/missing")));
+        QVERIFY(hasPasteMarker(directory, 1));
+        // A successful append while OFF invalidates the old marker even if death prevents its deletion.
+        QVERIFY(saveStackItem(directory, 1, old));
+        QVERIFY(!hasPasteMarker(directory, 2));
+        QVERIFY(savePasteMarker(directory, 2));
+        const auto trash = directory + QStringLiteral("-cleared-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+        QVERIFY(QDir().rename(directory, trash));
+        cleanupRetiredStacks(directory);
+        QVERIFY(!hasPasteMarker(directory, 2));
+        QVERIFY(!QDir(directory).exists());
+        QVERIFY(!QDir(trash).exists());
+    }
     void statePathDoesNotIncludeApplicationName() {
         const auto previous = qgetenv("XDG_STATE_HOME");
         const auto application = QCoreApplication::applicationName();
@@ -14,6 +98,8 @@ private slots:
         if (previous.isNull()) qunsetenv("XDG_STATE_HOME"); else qputenv("XDG_STATE_HOME", previous);
     }
     void classification() {
+        QVERIFY(!hasPayload({{QStringLiteral("text/plain"), QByteArray()}, {QStringLiteral("UTF8_STRING"), QByteArray()}}));
+        QVERIFY(hasPayload({{QStringLiteral("text/plain"), QByteArray()}, {QStringLiteral("text/html"), "<b></b>"}}));
         QCOMPARE(kind({{QStringLiteral("text/plain"), "hi"}, {QStringLiteral("text/html"), "<b>hi</b>"}}), Kind::Text);
         QCOMPARE(kind({{QStringLiteral("text/plain"), "alt"}, {QStringLiteral("image/png"), "png"}}), Kind::Image);
         QCOMPARE(kind({{QStringLiteral("application/x-qt-image"), "png"}}), Kind::Image);

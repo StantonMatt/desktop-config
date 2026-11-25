@@ -253,7 +253,9 @@ private:
         switch (flow.shortcutPress()) {
         case DaemonLogic::CaptureFlow::Press::Cancel: closeOverlay(); logLine(QStringLiteral("shortcut-cancel")); break;
         case DaemonLogic::CaptureFlow::Press::Busy: logLine(QStringLiteral("capture-busy")); break;
-        case DaemonLogic::CaptureFlow::Press::Capture: appendSelection = toStack; startCapture(false); break;
+        case DaemonLogic::CaptureFlow::Press::Capture:
+            if (toStack && !stack.canAdd()) return;
+            appendSelection = toStack; startCapture(false); break;
         }
     }
     // retry marks the capture a press gets after a rebuild (CaptureFlow).

@@ -18,7 +18,7 @@ import shutil
 
 HERE = pathlib.Path(__file__).resolve().parent
 BUILD = pathlib.Path(sys.argv[1]).resolve()
-OUT = pathlib.Path.home() / '.cache/agent-scratch/desktop-config/clipboard-stack/e2e'
+OUT = pathlib.Path(os.environ.get('QRO_STACK_OUT') or pathlib.Path.home() / '.cache/agent-scratch/desktop-config/clipboard-stack/e2e')
 OUT.mkdir(parents=True, exist_ok=True)
 TERMINAL_ONLY = os.environ.get('QRO_TERMINAL_ONLY') == '1'
 runtime = pathlib.Path(os.environ.get('QRO_STACK_RUNTIME') or tempfile.mkdtemp(prefix='qro-stack-'))
@@ -60,6 +60,9 @@ config = OUT / 'config'
 config.mkdir(exist_ok=True)
 (config / 'kglobalshortcutsrc').write_text('[services][org.kde.spectacle.desktop]\n_launch=none\n')
 (config / 'klipperrc').write_text('[General]\nMaxClipItems=40\nKeepClipboardContents=true\nIgnoreImages=false\n')
+(config / 'quick-region-overlayrc').write_text('[Stack]\nNewStackAfterPaste=true\n')
+STACK_DIR = OUT / 'state/quick-region-overlay/stack'
+MARKER = STACK_DIR / 'pasted'
 subprocess.run(['kbuildsycoca6', '--noincremental'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
 def run(*args, check=True):
@@ -124,6 +127,25 @@ def copy(text, expected):
     shortcut('c')
     wait(lambda: stack('Count') == str(expected), f'copy {expected}')
 
+def osd_count(text):
+    return sum(path.read_text().count('stack-osd ' + text + '\n') for path in OUT.glob('daemon*.log'))
+
+def setting(enabled):
+    run('kwriteconfig6', '--file', 'quick-region-overlayrc', '--group', 'Stack', '--key', 'NewStackAfterPaste', str(enabled).lower())
+
+def pasted(count):
+    return stack('State') == f'0:{count}' and MARKER.exists() and MARKER.read_text() == f'{count}\n'
+
+def paste_text(count):
+    probe('ResetEvents'); shortcut('v')
+    wait(lambda: len(json.loads(probe('Events'))) == 1, 'merged text received')
+    wait(lambda: pasted(count), 'successful paste marker')
+
+def capture(expected):
+    shortcut('s'); time.sleep(0.3)
+    run(str(BUILD / 'stack-input'), 'drag', '300', '300', '420', '380')
+    wait(lambda: stack('Count') == str(expected), 'stack screenshot')
+
 results = []
 def passed(name, **evidence):
     results.append(dict(check=name, **evidence))
@@ -150,6 +172,28 @@ with contextlib.ExitStack() as cleanup:
     # Existing isolated data from an interrupted run belongs to this harness.
     shortcut('x'); wait(lambda: stack('Count') == '0', 'initial clear')
     if not TERMINAL_ONLY:
+        # Actual installed Plasma plugin, private bus/config: file edits alone are not a reload.
+        dbus('org.kde.klipper', '/klipper', 'org.kde.klipper.klipper.clearClipboardHistory')
+        run('kwriteconfig6', '--file', 'klipperrc', '--group', 'General', '--key', 'MaxClipItems', '2')
+        run('kwriteconfig6', '--file', 'klipperrc', '--group', 'General', '--key', 'IgnoreImages', '--type', 'bool', 'true')
+        for number in range(3):
+            value = f'klipper reload {number}'
+            probe('Custom', 'binary', value); probe('Offer')
+            wait(lambda: value in history(), 'Klipper ordinary text')
+        assert len(history().splitlines()) == 3, history()
+        dbus('org.kde.klipper', '/klipper', 'org.kde.klipper.klipper.reloadConfig')
+        wait(lambda: len(history().splitlines()) == 2, 'Klipper live history limit')
+        text_history = history()
+        probe('Custom', 'image', '#664422'); probe('Offer')
+        wait(lambda: 'image/png' in clipboard(), 'ignored image offered')
+        time.sleep(0.25)
+        assert history() == text_history, history()
+        run('kwriteconfig6', '--file', 'klipperrc', '--group', 'General', '--key', 'MaxClipItems', '40')
+        run('kwriteconfig6', '--file', 'klipperrc', '--group', 'General', '--key', 'IgnoreImages', '--type', 'bool', 'false')
+        dbus('org.kde.klipper', '/klipper', 'org.kde.klipper.klipper.reloadConfig')
+        probe('Custom', 'image', '#224466'); probe('Offer')
+        wait(lambda: history() != text_history, 'Klipper keeps image after live reload')
+        passed('Klipper reloadConfig applies history limit and image preference live', before_reload=3, after_reload=2, images_kept=history())
         copy('alpha', 1)
         assert clipboard()['text/plain'] == b'alpha'
         probe('ResetEvents')
@@ -182,10 +226,12 @@ with contextlib.ExitStack() as cleanup:
         probe('PasteDelay', 250); probe('ResetEvents'); shortcut('v')
         wait(lambda: len(json.loads(probe('Events'))) == 3, 'delayed target reads')
         wait(lambda: stack('State') == '0:4', 'delayed paste completion')
+        wait(lambda: pasted(4), 'persisted paste marker')
         delayed = json.loads(probe('Events'))
         assert base64.b64decode(delayed[0]['text/plain']) == b'one\ntwo'
         assert 'image/png' in delayed[1]
         assert base64.b64decode(delayed[2]['text/plain']) == b'three'
+        passed('repeat paste while marked preserves the same text/image/text set', count=4)
         probe('PasteDelay', 0); probe('IgnorePaste', 'true'); probe('ResetEvents'); shortcut('v')
         wait(lambda: stack('State').startswith('6:'), 'target offered item')
         wait(lambda: stack('State') == '0:4', 'no-read timeout')
@@ -196,17 +242,43 @@ with contextlib.ExitStack() as cleanup:
         stop(daemon)
         daemon = start('daemon-restart', [str(BUILD / 'quick-region-overlay'), '--daemon'])
         wait(lambda: stack('State') == '0:4', 'persisted stack')
-        passed('daemon restart preserves stack', count=4)
+        assert pasted(4)
+        passed('daemon restart preserves stack and pasted marker', count=4)
+        nothing_before = osd_count('Nothing copied')
+        probe('SuppressCopy', 'true'); shortcut('c')
+        wait(lambda: osd_count('Nothing copied') > nothing_before, 'failed copy OSD')
+        assert pasted(4), 'failed copy changed old stack or marker'
+        probe('SuppressCopy', 'false')
+        new_before = osd_count('New stack: 1 item')
+        copy('fresh after paste', 1)
+        wait(lambda: osd_count('New stack: 1 item') > new_before, 'new-stack OSD')
+        assert not MARKER.exists()
+        copy('second fresh item', 2)
+        passed('successful copy replaces marked stack, OSD; failed copy preserves it', count=2)
+        # Abort on a stack that has never been successfully pasted: no marker, and next copy still appends.
+        probe('IgnorePaste', 'true'); shortcut('v')
+        wait(lambda: stack('State').startswith('6:'), 'unread offer before abort')
+        wait(lambda: stack('State') == '0:2', 'unmarked no-read timeout')
+        assert not MARKER.exists()
+        probe('IgnorePaste', 'false'); copy('after aborted paste', 3)
+        paste_text(3)
+        setting(False); copy('OFF appends after marked paste', 4)
+        assert not MARKER.exists()
+        paste_text(4)
+        setting(False); copy('OFF still appends', 5)
+        setting(True); copy('ON after OFF append remains unmarked', 6)
+        passed('aborted paste does not mark; live OFF appends and retires previous marker; ON resumes', count=6)
+        paste_text(6)
         shortcut('x'); wait(lambda: stack('Count') == '0', 'clear persisted stack')
+        assert not MARKER.exists()
         stop(daemon)
         daemon = start('daemon-cleared', [str(BUILD / 'quick-region-overlay'), '--daemon'])
         wait(lambda: stack('State') == '0:0', 'clear survives restart')
+        assert not MARKER.exists()
         passed('clear persists', count=0)
         passed('shortcuts', capture=dbus('org.local.QuickRegionOverlay', '/', 'org.local.QuickRegionOverlay.ShortcutStatus'), stack=dbus('org.local.QuickRegionOverlay', '/', 'org.local.QuickRegionOverlay.StackShortcutStatus'))
         # Screenshot variants: a real crop offer, and no append through the two original shortcuts.
-        shortcut('s'); time.sleep(0.3)
-        run(str(BUILD / 'stack-input'), 'drag', '300', '300', '420', '380')
-        wait(lambda: stack('Count') == '1', 'stack screenshot')
+        capture(1)
         assert 'image/png' in clipboard()
         for sequence in [('99:1', '99:0'), ('125:1', '42:1', '31:1', '31:0', '42:0', '125:0')]:
             assert stack('Focus') == 'qro-stack-probe'
@@ -218,7 +290,7 @@ with contextlib.ExitStack() as cleanup:
         passed('Ctrl+Alt+S appends; Print and Meta+Shift+S retain normal capture behavior')
         shortcut('x'); wait(lambda: stack('Count') == '0', 'clear before Konsole')
         for count in range(1, 101): copy('cap test', count)
-        stack_dir = OUT / 'state/quick-region-overlay/stack'
+        stack_dir = STACK_DIR
         assert len(list(stack_dir.glob('*.qrs'))) == 100
         assert stack_dir.stat().st_mode & 0o777 == 0o700
         assert all(path.stat().st_mode & 0o777 == 0o600 for path in stack_dir.glob('*.qrs'))
@@ -226,6 +298,18 @@ with contextlib.ExitStack() as cleanup:
         time.sleep(0.1)
         assert stack('Count') == '100'
         passed('100-item cap refuses overflow; exact state path and private permissions')
+        paste_text(100)
+        assert MARKER.stat().st_mode & 0o777 == 0o600
+        copy('new stack bypasses copy cap', 1)
+        assert not MARKER.exists()
+        for count in range(2, 101): copy('capture cap test', count)
+        paste_text(100)
+        new_before = osd_count('New stack: 1 item')
+        capture(1)
+        wait(lambda: osd_count('New stack: 1 item') > new_before, 'new screenshot stack OSD')
+        assert not MARKER.exists()
+        assert 'image/png' in clipboard()
+        passed('full marked stack permits new copy and new screenshot, each replaces with one item', count=1)
         shortcut('x'); wait(lambda: stack('Count') == '0', 'clear capped stack')
     terminal_file = OUT / 'terminal-input'
     terminal_file.write_bytes(b'')
