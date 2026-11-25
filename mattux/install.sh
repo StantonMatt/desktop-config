@@ -10,15 +10,19 @@ done
 for package in qt6-base-dev libkf6statusnotifieritem-dev libkf6globalaccel-dev libkf6xmlgui-dev libkf6config-dev libkf6widgetsaddons-dev libkf6guiaddons-dev; do
     [[ $(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null) == installed ]] || fail "Missing $package. Install dependencies with: $apt_line"
 done
-[[ -x "$HOME/.local/bin/heavy" ]] || fail 'Missing ~/.local/bin/heavy, required for the Release build.'
 take_lock
 check_files
-scratch="$HOME/.cache/agent-scratch/desktop-config"
+scratch="${XDG_CACHE_HOME:-$HOME/.cache}/mattux"
 mkdir -p -- "$scratch"
 work=$(mktemp -d "$scratch/mattux-install.XXXXXX")
 trap 'rm -rf -- "${work:?}"' EXIT
 cmake -S "$source_dir" -B "$work/build" -DCMAKE_BUILD_TYPE=Release || fail "Could not configure Mattux. Install dependencies with: $apt_line"
-"$HOME/.local/bin/heavy" cmake --build "$work/build" --parallel 2 --target mattux
+# heavy (optional) queues builds behind other heavy jobs on machines that have it.
+if command -v heavy >/dev/null; then
+    heavy cmake --build "$work/build" --parallel 2 --target mattux
+else
+    cmake --build "$work/build" --parallel 2 --target mattux
+fi
 check_files
 systemctl --user stop mattux.service 2>/dev/null || true
 sed "s|@HOME@|$HOME|g" "$source_dir/mattux.desktop" >"$work/mattux.desktop"

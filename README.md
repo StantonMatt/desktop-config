@@ -1,4 +1,34 @@
 # desktop-config
 
-- [Screenshot](screenshot/): region screenshots and a persistent clipboard stack. Install: `./screenshot/install.sh`
-- [Mattux](mattux/): a system tray menu for desktop tweaks. Install: `./mattux/install.sh`
+Desktop tweaks for KDE Plasma 6 on Wayland, developed on Kubuntu 26.04. Each tweak lives in its own folder with its own installer and rollback.
+
+| Tweak | What it does |
+| --- | --- |
+| [Screenshot](screenshot/) | Meta+Shift+S / Print freeze the screen and copy a dragged region. Clipboard stack: Ctrl+Alt+C copies and Ctrl+Alt+S screenshots onto a stack, Ctrl+Alt+V pastes it all (oldest first), Ctrl+Alt+X clears it. Ctrl+Alt can stay held throughout. |
+| [Mattux](mattux/) | Tray icon with the stack count. Its menu pastes or clears the stack and sets the new-stack-after-paste option, clipboard history, every shortcut above, and an on/off switch. |
+
+## Install
+
+```sh
+sudo apt install git build-essential cmake pkg-config libwayland-dev libwayland-bin qt6-base-dev qt6-wayland libkf6guiaddons-dev liblayershellqtinterface-dev libkf6globalaccel-dev libkf6config-bin libkf6config-dev qdbus-qt6 libkf6service-bin kde-spectacle ydotool jq coreutils gawk sed grep perl util-linux systemd dbus-user-session libkf6statusnotifieritem-dev libkf6xmlgui-dev libkf6widgetsaddons-dev
+sudo usermod -aG input "$USER"   # then log out and back in
+systemctl --user enable --now ydotool.service
+git clone https://github.com/StantonMatt/desktop-config.git
+cd desktop-config
+./screenshot/install.sh
+./mattux/install.sh
+```
+
+The clipboard stack needs the `input` group (to see held keys and type copy/paste) and the ydotool user service. Each installer checks its requirements and prints the missing `apt` line before changing anything.
+
+## Update
+
+```sh
+cd desktop-config && git pull
+./screenshot/install.sh
+./mattux/install.sh
+```
+
+## Uninstall
+
+`./mattux/rollback.sh`, then `./screenshot/rollback.sh` (restores Spectacle's keys). Details are in each folder's README.
