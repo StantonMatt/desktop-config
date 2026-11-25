@@ -15,6 +15,8 @@ import sys
 import time
 import tempfile
 import shutil
+import re
+from PIL import Image
 
 HERE = pathlib.Path(__file__).resolve().parent
 BUILD = pathlib.Path(sys.argv[1]).resolve()
@@ -147,7 +149,8 @@ def paste_text(count):
     wait(lambda: pasted(count), 'successful paste marker')
 
 def capture(expected):
-    shortcut('s'); time.sleep(0.3)
+    shortcut('s')
+    wait(lambda: any(w['resourceClass'] == 'quick-region-overlay' and w['width'] == 1024 for w in json.loads(probe('Windows'))), 'stack capture overlay')
     run(str(BUILD / 'stack-input'), 'drag', '300', '300', '420', '380')
     wait(lambda: stack('Count') == str(expected), 'stack screenshot')
 
@@ -182,7 +185,26 @@ def wheels():
 
 def is_wheel(window):
     return (window.get('resourceClass') == 'quick-region-overlay' and
-            window['width'] == 28 and window['height'] == 28 and not window['hidden'])
+            window['width'] == 18 and window['height'] == 18 and not window['hidden'])
+
+def daemon_text():
+    return current_daemon_log.read_text()
+
+def log_time(text, event):
+    return int(re.search(r'(\d{13}) ' + re.escape(event), text)[1])
+
+def measured_paste(count, expected_path):
+    offset = len(daemon_text())
+    probe('ResetEvents'); shortcut('v')
+    wait(lambda: 'stack-key paste' in daemon_text()[offset:], 'first paste key')
+    wait(lambda: pasted(count), 'measured paste completed')
+    text = daemon_text()[offset:]
+    originals = re.findall(r'stack-paste-original (\w+) ms=(\d+)', text)
+    assert len(originals) == 1 and originals[0][0] == expected_path, originals
+    evidence = dict(path=expected_path, original_ms=int(originals[0][1]),
+                    press_to_key_ms=log_time(text, 'stack-key paste') - log_time(text, 'stack-paste-pressed'),
+                    release_to_key_ms=log_time(text, 'stack-key paste') - log_time(text, 'stack-paste-released'))
+    return evidence
 
 def wheel_at(x, y):
     current = wheels()
@@ -199,24 +221,27 @@ def spinner_checks():
         probe('PasteDelay', 800); probe('ResetEvents')
         activation_start = len(json.loads(probe('Activations')))
         shortcut('v')
-        wheel = wait(lambda: wheel_at(416, 416), 'busy wheel during slow paste')
+        wheel = wait(lambda: wheel_at(412, 412), 'busy wheel during slow paste')
         assert not wheel['active'] and not wheel['wantsInput'], wheel
-        assert wheel['width'] == 28 and wheel['height'] == 28, wheel
-        assert (wheel['x'], wheel['y']) == (416, 416), wheel
+        assert wheel['width'] == 18 and wheel['height'] == 18, wheel
+        assert (wheel['x'], wheel['y']) == (412, 412), wheel
         assert stack('FocusId') == focus and probe('Active') == 'true'
-        assert probe('Screenshot', OUT / ('spinner-' + name + '.png')) == 'true'
+        full = OUT / ('wheel-' + name + '.png')
+        assert probe('Screenshot', full) == 'true'
+        with Image.open(full) as image:
+            image.crop((398, 398, 444, 444)).resize((460, 460), Image.Resampling.NEAREST).save(OUT / ('wheel-' + name + '-crop.png'))
         run(str(BUILD / 'stack-input'), 'mouse', '1100', '400')
-        wait(lambda: wheel_at(1116, 416), 'wheel moves to second output only')
+        wait(lambda: wheel_at(1112, 412), 'wheel moves to second output only')
         run(str(BUILD / 'stack-input'), 'mouse', '460', '420')
-        moved = wait(lambda: wheel_at(476, 436), 'wheel returns to first output only')
+        moved = wait(lambda: wheel_at(472, 432), 'wheel returns to first output only')
         clicks = int(probe('Clicks'))
         # Motion and press share a Wayland batch: hit the old wheel before the throttled tracker moves it.
-        run(str(BUILD / 'stack-input'), 'mouse', str(int(moved['x']) + 14), str(int(moved['y']) + 14), '1')
-        run(str(BUILD / 'stack-input'), 'mouse', str(int(moved['x']) + 14), str(int(moved['y']) + 14), '0')
+        run(str(BUILD / 'stack-input'), 'mouse', str(int(moved['x']) + 9), str(int(moved['y']) + 9), '1')
+        run(str(BUILD / 'stack-input'), 'mouse', str(int(moved['x']) + 9), str(int(moved['y']) + 9), '0')
         wait(lambda: int(probe('Clicks')) == clicks + 1, 'pointer click passes through busy wheel')
-        moved = wait(lambda: wheel_at(506, 466), 'wheel after click')
+        moved = wait(lambda: wheel_at(493, 453), 'wheel after click')
         scrolls = int(probe('Scrolls'))
-        run(str(BUILD / 'stack-input'), 'wheel', str(int(moved['x']) + 14), str(int(moved['y']) + 14))
+        run(str(BUILD / 'stack-input'), 'wheel', str(int(moved['x']) + 9), str(int(moved['y']) + 9))
         wait(lambda: int(probe('Scrolls')) == scrolls + 1, 'scroll passes through busy wheel')
         wait(lambda: stack('State') == '0:4', 'slow paste with busy wheel finishes')
         wait(lambda: not wheels(), 'busy wheel unmapped on completion', timeout=0.1)
@@ -256,9 +281,11 @@ def passed(name, **evidence):
 
 with contextlib.ExitStack() as cleanup:
     def start(name, args):
+        global current_daemon_log
         log = cleanup.enter_context((OUT / (name + '.log')).open('a'))
         environment = os.environ.copy()
         if args[0] == str(BUILD / 'quick-region-overlay'):
+            current_daemon_log = OUT / (name + '.log')
             environment['LD_PRELOAD'] = str(BUILD / 'libstack-modifiers.so')
             environment['QRO_STACK_SAVE_GATE'] = str(OUT / 'save-gate')
         process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, env=environment)
@@ -311,6 +338,8 @@ with contextlib.ExitStack() as cleanup:
         wait(lambda: history() != text_history, 'Klipper keeps image after live reload')
         passed('Klipper reloadConfig applies history limit and image preference live', before_reload=3, after_reload=2, images_kept=history())
         prepare('alpha')
+        wait(lambda: not wheels(), 'initial clear wheel finishes')
+        copy_offset = len(daemon_text())
         # Hold the actual fsync in the isolated daemon, rather than sleeping in the test driver.
         gate = OUT / 'save-gate'
         gate.touch()
@@ -323,25 +352,47 @@ with contextlib.ExitStack() as cleanup:
         finally:
             gate.unlink(missing_ok=True)
         wait(lambda: stack('State') == '0:1', 'copy save completion')
-        wait(lambda: not wheels(), 'wheel hides after save', timeout=0.1)
-        passed('busy wheel remains responsive during copy persistence and hides after save')
+        copy_log = daemon_text()[copy_offset:]
+        immediate_ms = log_time(copy_log, 'stack-busy-shown') - log_time(copy_log, 'stack-copy-pressed')
+        assert 0 <= immediate_ms < 140, immediate_ms
+        wait(lambda: not wheels(), 'disk-save wheel finishes')
+        passed('wheel maps immediately and remains responsive during copy persistence', show_after_press_ms=immediate_ms)
+        shortcut('x'); wait(lambda: stack('State') == '0:0', 'clear slow warmup copy')
+        wait(lambda: wheels(), 'warmup clear wheel maps')
+        wait(lambda: not wheels(), 'warmup clear wheel finishes')
+        copy_offset = len(daemon_text())
+        copy('alpha', 1)
+        wait(lambda: wheels(), 'fast copy wheel')
         assert clipboard()['text/plain'] == b'alpha'
+        before = clipboard()
+        assert stack('State') == '0:1' and wheels(), 'paste fixture must start during linger'
+        wait(lambda: dbus('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting.isScriptLoaded', 'quick-region-overlay-stack-pointer') == 'false', 'pointer tracking stops during ready linger')
+        timing = measured_paste(1, 'cached')
+        assert clipboard() == before
+        assert timing['press_to_key_ms'] < 140, timing
+        wait(lambda: not wheels(), 'wheel hides after minimum display')
+        copy_log = daemon_text()[copy_offset:]
+        visible_ms = log_time(copy_log, 'stack-busy-hidden') - log_time(copy_log, 'stack-busy-shown')
+        assert visible_ms >= 390, visible_ms
+        passed('minimum visibility, cached exact restore, paste during linger', visible_ms=visible_ms, **timing)
         probe('ResetEvents')
         input_keys('29:1', '47:1', '47:0', '29:0')
         first = json.loads(probe('Events'))
         assert base64.b64decode(first[0]['text/plain']) == b'alpha'
-        copy('alpha', 2)
+        setting(False); copy('alpha', 2); setting(True)
         passed('GUI copy, identical copies, normal paste', count=2)
-        fast_start = len(json.loads(probe('WindowEvents')))
+        wait(lambda: not wheels(), 'copy wheel tail finishes')
+        clear_offset = len(daemon_text())
         clear_start = time.monotonic()
         shortcut('x'); wait(lambda: stack('Count') == '0', 'clear')
         clear_ms = (time.monotonic() - clear_start) * 1000
         assert clear_ms < 150, ('fast-operation fixture took too long', clear_ms)
-        time.sleep(0.18)
-        fast_events = json.loads(probe('WindowEvents'))[fast_start:]
-        assert not any(is_wheel(w) for e in fast_events for w in e['state']), fast_events
+        wait(lambda: wheels(), 'fast clear receives visible feedback')
+        wait(lambda: not wheels(), 'fast clear minimum visibility finishes')
+        clear_log = daemon_text()[clear_offset:]
+        assert log_time(clear_log, 'stack-busy-hidden') - log_time(clear_log, 'stack-busy-shown') >= 390
         assert dbus('org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting.isScriptLoaded', 'quick-region-overlay-stack-pointer') == 'false'
-        passed('fast clear below 150 ms never maps busy wheel or loads pointer script', elapsed_ms=round(clear_ms, 1))
+        passed('fast clear maps wheel for minimum visibility and unloads pointer script', elapsed_ms=round(clear_ms, 1))
         copy('one', 1); copy('two', 2)
         probe('Custom', 'image', '#ff0000'); shortcut('c'); wait(lambda: stack('Count') == '3', 'copy image')
         copy('three', 4)
@@ -350,8 +401,7 @@ with contextlib.ExitStack() as cleanup:
         wait(lambda: 'restore sentinel' in history(), 'Klipper observes ordinary copy', timeout=5)
         history_before = history()
         before = clipboard()
-        probe('ResetEvents'); shortcut('v')
-        wait(lambda: stack('State') == '0:4', 'stack paste')
+        timing = measured_paste(4, 'snapshot')
         events = json.loads(probe('Events'))
         assert len(events) == 3, events
         assert base64.b64decode(events[0]['text/plain']) == b'one\ntwo'
@@ -361,7 +411,7 @@ with contextlib.ExitStack() as cleanup:
         assert after == before, (after, before)
         assert history() == history_before, (history(), history_before)
         passed('Klipper excludes intermediate offers', before=history_before, after=history())
-        passed('text,text,image,text order and exact clipboard restore', events=events)
+        passed('text,text,image,text order; external selection invalidates cache and restores exactly', events=events, **timing)
         probe('PasteDelay', 250); probe('ResetEvents'); shortcut('v')
         wait(lambda: len(json.loads(probe('Events'))) == 3, 'delayed target reads')
         wait(lambda: stack('State') == '0:4', 'delayed paste completion')
@@ -421,14 +471,49 @@ with contextlib.ExitStack() as cleanup:
         passed('clear persists', count=0)
         passed('shortcuts', capture=dbus('org.local.QuickRegionOverlay', '/', 'org.local.QuickRegionOverlay.ShortcutStatus'), stack=dbus('org.local.QuickRegionOverlay', '/', 'org.local.QuickRegionOverlay.StackShortcutStatus'))
         # Screenshot variants: a real crop offer, and no append through the two original shortcuts.
-        capture(1)
-        assert 'image/png' in clipboard()
+        old_history = history()
+        for count, color in enumerate(('#404142', '#545556', '#68696a'), 1):
+            wait(lambda: not wheels(), 'previous wheel finished before region selection')
+            probe('Background', color)
+            offset = len(daemon_text())
+            capture(count)
+            wait(lambda: wheels(), 'stack screenshot wheel appears after overlay closes')
+            text = daemon_text()[offset:]
+            show_ms = log_time(text, 'stack-busy-shown') - log_time(text, 'stack-capture-closed')
+            assert 0 <= show_ms < 140, show_ms
+        before = clipboard()
+        assert set(before) == {'image/png'}, before.keys()
+        wait(lambda: history() != old_history, 'Klipper records stack screenshot')
+        screenshot_history = history()
+        samples = []
+        for repeat in range(3):
+            samples.append(measured_paste(3, 'owned'))
+            assert len(json.loads(probe('Events'))) == 3
+            assert clipboard() == before
+            assert history() == screenshot_history, (history(), screenshot_history)
+        passed('three stack screenshots prepare owned paste and exact restore; Klipper records add and excludes intermediate offers', samples=samples)
+        probe('SaveClipboard')
+        wait(lambda: probe('SavedState').startswith('ready:'), 'save screenshot for same-byte comparison')
+        same_bytes = []
+        for repeat in range(3):
+            probe('RestoreSaved')
+            assert clipboard() == before
+            same_bytes.append(measured_paste(3, 'snapshot'))
+            assert clipboard() == before
+        passed('identical screenshot bytes from another owner still invalidate preparation', samples=same_bytes)
+        fallback_samples = []
+        for repeat in range(3):
+            probe('Custom', 'binary', 'external change after screenshots ' + str(repeat)); probe('Offer')
+            replacement = clipboard()
+            fallback_samples.append(measured_paste(3, 'snapshot'))
+            assert clipboard() == replacement
+        passed('external client changes after image add force snapshot and exact restoration', samples=fallback_samples)
         for sequence in [('99:1', '99:0'), ('125:1', '42:1', '31:1', '31:0', '42:0', '125:0')]:
             assert stack('Focus') == 'qro-stack-probe'
             input_keys(*sequence); time.sleep(0.3)
             run(str(BUILD / 'stack-input'), 'drag', '320', '320', '440', '400')
             time.sleep(0.2)
-            assert stack('Count') == '1'
+            assert stack('Count') == '3'
             assert 'image/png' in clipboard()
         passed('Ctrl+Alt+S appends; Print and Meta+Shift+S retain normal capture behavior')
         shortcut('x'); wait(lambda: stack('Count') == '0', 'clear before Konsole')

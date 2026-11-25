@@ -13,6 +13,7 @@
 #include <csignal>
 #include <cstring>
 #include <poll.h>
+#include <limits>
 
 namespace {
 class Transport;
@@ -34,6 +35,8 @@ public:
     Source *current = nullptr;
     QHash<ext_data_control_offer_v1 *, QStringList> offers;
     ext_data_control_offer_v1 *selection = nullptr;
+    quint64 generation = 0, cachedGeneration = 0;
+    std::optional<ClipboardStack::Item> cached;
     bool initialized = false;
     bool observing = false;
     explicit Transport(StackClipboard *api) : api(api) {}
@@ -108,6 +111,7 @@ public:
                 auto *self = static_cast<Transport *>(data);
                 if (self->selection && self->selection != offer) { self->offers.remove(self->selection); ext_data_control_offer_v1_destroy(self->selection); }
                 self->selection = offer;
+                ++self->generation;
                 if (self->observing) emit self->api->changed();
             },
             [](void *data, ext_data_control_device_v1 *device) {
@@ -141,14 +145,36 @@ public:
         observing = device != nullptr;
     }
     std::optional<ClipboardStack::Item> ownedItem() {
-        if (device) sync(); // Observe any replacement already accepted by the compositor.
+        if (!device || !sync()) return std::nullopt; // Never trust ownership after a failed round-trip.
         if (current) return current->item;
         return std::nullopt;
     }
-    void snapshot(quint64 serial, qint64 limit) {
+    void prepareOriginal(quint64 serial) {
+        QElapsedTimer timer;
+        timer.start();
+        // Dispatch selection and cancellation events before trusting either cache.
+        if (!device || !sync()) {
+            emit api->originalReady(serial, {}, QStringLiteral("Clipboard unavailable"), QStringLiteral("snapshot"), timer.elapsed());
+            return;
+        }
+        if (current) {
+            emit api->originalReady(serial, current->item, {}, QStringLiteral("owned"), timer.elapsed());
+        } else if (cached && cachedGeneration == generation) {
+            emit api->originalReady(serial, *cached, {}, QStringLiteral("cached"), timer.elapsed());
+        } else {
+            snapshot(serial, std::numeric_limits<qint64>::max(), true, timer);
+        }
+    }
+    void snapshot(quint64 serial, qint64 limit, bool original = false, QElapsedTimer timer = {}) {
         if (!initialized) init();
-        if (!device) { emit api->snapshotReady(serial, {}, QStringLiteral("Clipboard unavailable")); return; }
-        if (!selection) { emit api->snapshotReady(serial, {}, {}); return; }
+        if (!timer.isValid()) timer.start();
+        const auto deliver = [this, serial, original, timer](const ClipboardStack::Item &item, const QString &error) {
+            if (original) emit api->originalReady(serial, item, error, QStringLiteral("snapshot"), timer.elapsed());
+            else emit api->snapshotReady(serial, item, error);
+        };
+        if (!device || (!original && !sync())) { deliver({}, QStringLiteral("Clipboard unavailable")); return; }
+        const quint64 capturedGeneration = generation;
+        if (!selection) { cached = ClipboardStack::Item{}; cachedGeneration = generation; deliver({}, {}); return; }
         struct Read final : QObject {
             ClipboardStack::Item item;
             QList<int> fds;
@@ -161,12 +187,20 @@ public:
             ~Read() override { for (int fd : fds) close(fd); }
         };
         auto *read = new Read(this);
-        auto finish = [this, read, serial](const QString &error) {
+        auto finish = [this, read, deliver, original, capturedGeneration](QString error) {
             if (read->finished) return;
             read->finished = true;
             if (read->idle) read->idle->stop();
             for (auto *notifier : read->findChildren<QSocketNotifier *>()) notifier->setEnabled(false);
-            emit api->snapshotReady(serial, error.isEmpty() ? read->item : ClipboardStack::Item{}, error);
+            // An in-flight read belongs to its original offer, even if another selection arrives.
+            // It can still be added, but must never be cached as the new selection.
+            if (error.isEmpty() && capturedGeneration == generation) {
+                cached = read->item;
+                cachedGeneration = capturedGeneration;
+            } else if (original && error.isEmpty()) {
+                error = QStringLiteral("Clipboard changed while reading; try again");
+            }
+            deliver(error.isEmpty() ? read->item : ClipboardStack::Item{}, error);
             read->deleteLater();
         };
         const auto formats = ClipboardStack::snapshotFormats(offers.value(selection));
@@ -307,6 +341,9 @@ void StackClipboard::offer(const ClipboardStack::Item &item, quint64 serial) {
 }
 void StackClipboard::snapshot(quint64 serial, qint64 limit) {
     QMetaObject::invokeMethod(worker, [this, serial, limit] { static_cast<Transport *>(worker)->snapshot(serial, limit); }, Qt::QueuedConnection);
+}
+void StackClipboard::prepareOriginal(quint64 serial) {
+    QMetaObject::invokeMethod(worker, [this, serial] { static_cast<Transport *>(worker)->prepareOriginal(serial); }, Qt::QueuedConnection);
 }
 std::optional<ClipboardStack::Item> StackClipboard::ownedItem() {
     std::optional<ClipboardStack::Item> result;

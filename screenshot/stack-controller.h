@@ -30,14 +30,16 @@ public slots:
     QString FocusId() const { return activeId; }
 private:
     void appended(const ClipboardStack::Item &item, ClipboardStack::AddMode mode, const QString &error);
-    enum class Operation { Idle, Modifiers, Copying, CopySnapshot, RestoreSnapshot, Offering, Pasting, Restoring, Stopping, Saving };
+    enum class Operation { Idle, Modifiers, Copying, CopySnapshot, RestoreSnapshot, Offering, Pasting, Restoring, Stopping, Saving, PreparingImage };
     Operation operation = Operation::Idle;
     StackBusy busyWheel{this};
     QThreadPool storage;
     void setOperation(Operation next);
     StackClipboard clipboard;
     QList<ClipboardStack::Item> items, pasteItems;
-    ClipboardStack::Item original;
+    ClipboardStack::Item original, pendingImage;
+    ClipboardStack::AddMode pendingImageMode = ClipboardStack::AddMode::Append;
+    QElapsedTimer addTime;
     bool restorePending = false;
     bool pasted = false, pasteSucceeded = false;
     QString directory, loadError, activeId, activeClass, targetId;

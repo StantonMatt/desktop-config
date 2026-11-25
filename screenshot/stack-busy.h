@@ -21,13 +21,15 @@ public:
 public slots:
     void CursorPosition(const QString &token, int x, int y);
 private:
-    QTimer delay, animation;
-    QElapsedTimer rotation;
+    QTimer linger, animation;
+    QElapsedTimer rotation, shown;
     QHash<QScreen *, QWidget *> windows;
     QPointer<QWidget> visible;
     QString token, scriptName;
     QSharedPointer<QTemporaryFile> trackerFile;
     bool active = false;
     void startTracking();
+    void stopTracking();
+    void hide();
     void unload(const QString &name);
 };

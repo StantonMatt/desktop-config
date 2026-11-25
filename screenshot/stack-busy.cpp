@@ -1,5 +1,6 @@
 #include "stack-busy.h"
 #include <QApplication>
+#include <QDateTime>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCallWatcher>
@@ -29,7 +30,7 @@ public:
         setAttribute(Qt::WA_ShowWithoutActivating);
         setAttribute(Qt::WA_TransparentForMouseEvents);
         setFocusPolicy(Qt::NoFocus);
-        resize(28, 28);
+        resize(18, 18);
         winId();
         windowHandle()->setScreen(screen);
         auto *layer = LayerShellQt::Window::get(windowHandle());
@@ -47,13 +48,12 @@ public:
     void paintEvent(QPaintEvent *) override {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.translate(14, 14);
+        painter.translate(9, 9);
         painter.rotate(angle);
-        const QRectF arc(-9.5, -9.5, 19, 19);
-        painter.setPen(QPen(QColor(0, 0, 0, 100), 5, Qt::SolidLine, Qt::RoundCap));
+        const QRectF arc(-6, -6, 12, 12);
+        painter.setPen(QPen(QColor(0, 0, 0, 70), 4, Qt::SolidLine, Qt::RoundCap));
         painter.drawArc(arc, 0, 270 * 16);
-        // A non-activating tool window uses the inactive palette group, whose highlight may be grey.
-        painter.setPen(QPen(palette().color(QPalette::Active, QPalette::Highlight), 3, Qt::SolidLine, Qt::RoundCap));
+        painter.setPen(QPen(QColor(235, 235, 235, 230), 2, Qt::SolidLine, Qt::RoundCap));
         painter.drawArc(arc, 0, 270 * 16);
     }
 };
@@ -62,10 +62,10 @@ public:
 StackBusy::StackBusy(QObject *parent) : QObject(parent) {
     unload(pointerScript); // Retire a tracker left by an interrupted daemon before accepting shortcuts.
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/StackBusy"), this, QDBusConnection::ExportAllSlots);
-    delay.setSingleShot(true);
-    delay.setTimerType(Qt::PreciseTimer);
-    connect(&delay, &QTimer::timeout, this, &StackBusy::startTracking);
-    animation.setInterval(17); // At most 59 fps; only the visible 28 x 28 surface repaints.
+    linger.setSingleShot(true);
+    linger.setTimerType(Qt::PreciseTimer);
+    connect(&linger, &QTimer::timeout, this, &StackBusy::hide);
+    animation.setInterval(17); // At most 59 fps; only the visible 18 x 18 surface repaints.
     animation.setTimerType(Qt::PreciseTimer);
     connect(&animation, &QTimer::timeout, this, [this] {
         if (!visible) return;
@@ -75,7 +75,8 @@ StackBusy::StackBusy(QObject *parent) : QObject(parent) {
     connect(qApp, &QGuiApplication::screenRemoved, this, [this](QScreen *screen) { delete windows.take(screen); });
 }
 StackBusy::~StackBusy() {
-    setBusy(false);
+    stopTracking();
+    hide();
     qDeleteAll(windows);
 }
 void StackBusy::unload(const QString &name) {
@@ -88,21 +89,36 @@ void StackBusy::setBusy(bool busy) {
     if (active == busy) return;
     active = busy;
     if (busy) {
-        rotation.start();
-        delay.start(150);
+        linger.stop();
+        if (!shown.isValid()) rotation.start();
+        startTracking();
         return;
     }
-    delay.stop();
+    // Tracking belongs to the operation, not the minimum-visible tail. Shortcuts remain ready.
+    if (shown.isValid()) stopTracking();
+    if (shown.isValid() && shown.elapsed() < 400) linger.start(400 - int(shown.elapsed()));
+    else if (!shown.isValid() && !token.isEmpty()) {
+        // A fast save may finish before the asynchronous initial cursor report arrives.
+        // Keep that one report alive so even a fast operation receives visible feedback.
+    } else hide();
+}
+void StackBusy::hide() {
+    linger.stop();
     animation.stop();
-    token.clear(); // Ignore already queued cursor reports from the retired script.
     for (auto *window : windows) window->hide();
     visible.clear();
+    shown.invalidate();
+    token.clear();
+    qInfo() << QDateTime::currentMSecsSinceEpoch() << "stack-busy-hidden";
+}
+void StackBusy::stopTracking() {
     unload(scriptName);
     scriptName.clear();
     trackerFile.clear();
 }
 void StackBusy::startTracking() {
     if (!active) return;
+    stopTracking(); // Also retire an initial cursor request from a just-completed fast operation.
     token = QUuid::createUuid().toString(QUuid::WithoutBraces);
     scriptName = pointerScript;
     // Retain each file until its asynchronous load completes, even if another busy period starts meanwhile.
@@ -123,7 +139,7 @@ void StackBusy::startTracking() {
     connect(watch, &QDBusPendingCallWatcher::finished, this, [this, watch, file, current] {
         const QDBusPendingReply<int> reply = *watch;
         if (!reply.isError() && reply.value() >= 0) {
-            if (active && token == current) {
+            if (token == current) {
                 auto run = QDBusMessage::createMethodCall(QStringLiteral("org.kde.KWin"), QStringLiteral("/Scripting/Script%1").arg(reply.value()), QStringLiteral("org.kde.kwin.Script"), QStringLiteral("run"));
                 auto *started = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(run, 1000), this);
                 connect(started, &QDBusPendingCallWatcher::finished, this, [started, file] {
@@ -132,24 +148,27 @@ void StackBusy::startTracking() {
                     started->deleteLater();
                 });
             }
-            // setBusy(false) already queued unload after load on this same D-Bus connection. Do not
-            // unload here: another busy period may have queued its replacement under the same name.
         } else qWarning() << "stack-busy-pointer-unavailable" << reply.error().message();
         watch->deleteLater();
     });
 }
 void StackBusy::CursorPosition(const QString &current, int x, int y) {
-    if (!active || token.isEmpty() || current != token) return;
+    if (token.isEmpty() || current != token || (!active && shown.isValid())) return;
     auto *screen = QGuiApplication::screenAt(QPoint(x, y));
     if (!screen) { if (visible) visible->hide(); visible.clear(); return; }
     auto *&window = windows[screen];
     if (!window) window = new Wheel(screen);
     if (visible && visible != window) visible->hide();
     const QPoint local = QPoint(x, y) - screen->geometry().topLeft();
-    const int left = qBound(0, local.x() + 16, qMax(0, screen->geometry().width() - window->width()));
-    const int top = qBound(0, local.y() + 16, qMax(0, screen->geometry().height() - window->height()));
+    const int left = qBound(0, local.x() + 12, qMax(0, screen->geometry().width() - window->width()));
+    const int top = qBound(0, local.y() + 12, qMax(0, screen->geometry().height() - window->height()));
     LayerShellQt::Window::get(window->windowHandle())->setMargins(QMargins(left, top, 0, 0));
     visible = window;
     window->show();
+    if (!shown.isValid()) {
+        shown.start();
+        qInfo() << QDateTime::currentMSecsSinceEpoch() << "stack-busy-shown";
+        if (!active) { stopTracking(); linger.start(400); }
+    }
     if (!animation.isActive()) animation.start();
 }

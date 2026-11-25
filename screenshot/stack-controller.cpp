@@ -2,6 +2,7 @@
 #include "stack-holder.h"
 #include "stack-storage.h"
 #include <QBuffer>
+#include <QDateTime>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCallWatcher>
@@ -98,6 +99,8 @@ bool locked() {
 StackController::StackController(QObject *parent) : QObject(parent), clipboard(this) {
     storage.setMaxThreadCount(1);
     storage.setExpiryTimeout(1000);
+    // Probe input devices once at startup: closing the non-keyboards takes ~0.5 s, which would otherwise delay the first stack shortcut.
+    QTimer::singleShot(0, this, [] { physicalModifiers(); });
     qRegisterMetaType<ClipboardStack::Item>();
     directory = stateDirectory();
     cleanupClipboardHolders();
@@ -152,16 +155,27 @@ StackController::StackController(QObject *parent) : QObject(parent), clipboard(t
         if (operation == Operation::CopySnapshot) {
             if (!restorePending) original.clear();
             if (item.isEmpty()) finish(QStringLiteral("Nothing copied")); else append(item);
-        } else if (operation == Operation::RestoreSnapshot) {
-            original = item;
-            restorePending = true;
-            pasteItems = plan(items);
-            pasteIndex = 0;
-            nextPaste();
         }
+    });
+    connect(&clipboard, &StackClipboard::originalReady, this, [this](quint64 id, const Item &item, const QString &error, const QString &path, qint64 ms) {
+        if (id != serial || operation != Operation::RestoreSnapshot) return;
+        qInfo().noquote() << QDateTime::currentMSecsSinceEpoch() << "stack-paste-original" << path << QStringLiteral("ms=%1").arg(ms);
+        if (!error.isEmpty()) { finish(error); return; }
+        original = item;
+        restorePending = true;
+        pasteItems = plan(items);
+        pasteIndex = 0;
+        nextPaste();
     });
     connect(&clipboard, &StackClipboard::offered, this, [this](quint64 id, bool ok) {
         if (id != serial) return;
+        if (operation == Operation::PreparingImage) {
+            const auto item = std::move(pendingImage);
+            // Persistence already committed: keep memory and disk aligned even if ownership failed.
+            appended(item, pendingImageMode, {});
+            if (!ok) osd(QStringLiteral("Saved to stack; clipboard offer failed"));
+            return;
+        }
         if (operation == Operation::Restoring) {
             if (ok) restorePending = false;
             if (ok && pasteSucceeded) {
@@ -308,6 +322,7 @@ void StackController::appended(const Item &item, AddMode mode, const QString &er
     if (!error.isEmpty()) { finish(error); return; }
     if (mode == AddMode::Replace) items = {item}; else items << item;
     pasted = false;
+    qInfo().noquote() << QDateTime::currentMSecsSinceEpoch() << "stack-copy-saved" << QStringLiteral("ms=%1").arg(addTime.elapsed());
     finish(mode == AddMode::Replace ? QStringLiteral("New stack: 1 item") : items.size() == 1 ? QStringLiteral("Stack: 1 item") : QStringLiteral("Stack: %1 items").arg(items.size()));
 }
 void StackController::append(const Item &item) {
@@ -329,6 +344,8 @@ void StackController::appendImage(const QImage &image) {
     if (!loadError.isEmpty()) { osd(loadError); return; }
     const auto mode = addMode(items.size(), pasted, newStackAfterPaste());
     if (mode == AddMode::Full) { osd(QStringLiteral("Stack full (100 items)")); return; }
+    addTime.start();
+    qInfo() << QDateTime::currentMSecsSinceEpoch() << "stack-capture-closed";
     setOperation(Operation::Saving);
     const QString path = directory;
     const qsizetype count = items.size();
@@ -342,7 +359,15 @@ void StackController::appendImage(const QImage &image) {
         const Item encoded{{QStringLiteral("image/png"), png}};
         if (error.isEmpty() && size(encoded) > maxBytes) error = QStringLiteral("Item exceeds 64 MB");
         if (error.isEmpty()) error = persistItem(path, count, mode, encoded);
-        QMetaObject::invokeMethod(this, [this, encoded, mode, error] { appended(encoded, mode, error); }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, [this, encoded, mode, error] {
+            if (operation == Operation::Stopping) return;
+            if (!error.isEmpty()) { appended(encoded, mode, error); return; }
+            // Ordinary screenshot offer: unlike intermediate paste offers, Klipper must record this.
+            pendingImage = encoded;
+            pendingImageMode = mode;
+            setOperation(Operation::PreparingImage);
+            clipboard.offer(encoded, ++serial);
+        }, Qt::QueuedConnection);
     });
 }
 void StackController::clear() {
@@ -372,7 +397,9 @@ void StackController::waitModifiers(std::function<void()> next) {
     modifiers.start();
 }
 void StackController::copy() {
+    qInfo() << QDateTime::currentMSecsSinceEpoch() << "stack-copy-pressed";
     if (!canAdd()) return;
+    addTime.start();
     waitModifiers([this] {
         setOperation(Operation::Copying);
         copyChanged = false;
@@ -382,10 +409,19 @@ void StackController::copy() {
     });
 }
 void StackController::paste() {
+    qInfo() << QDateTime::currentMSecsSinceEpoch() << "stack-paste-pressed";
     if (!available()) return;
     if (items.isEmpty()) { osd(QStringLiteral("Stack empty")); return; }
     pasteSucceeded = false;
-    waitModifiers([this] { setOperation(Operation::RestoreSnapshot); takeSnapshot(std::numeric_limits<qint64>::max()); });
+    waitModifiers([this] {
+        qInfo() << QDateTime::currentMSecsSinceEpoch() << "stack-paste-released";
+        setOperation(Operation::RestoreSnapshot);
+        const quint64 id = ++serial;
+        clipboard.prepareOriginal(id);
+        QTimer::singleShot(700, this, [this, id] {
+            if (id == serial && operation == Operation::RestoreSnapshot) osd(QStringLiteral("Reading clipboard…"));
+        });
+    });
 }
 void StackController::takeSnapshot(qint64 limit) {
     const quint64 id = ++serial;
@@ -406,7 +442,7 @@ void StackController::key(bool copy, bool image, std::function<void()> next) {
     args << (copy ? QStringLiteral("46:1") : QStringLiteral("47:1")) << (copy ? QStringLiteral("46:0") : QStringLiteral("47:0"));
     if (shift) args << QStringLiteral("42:0");
     args << QStringLiteral("29:0");
-    qInfo().noquote() << "stack-key" << (copy ? "copy" : "paste") << "terminal=" << targetTerminal << "image=" << image;
+    qInfo().noquote() << QDateTime::currentMSecsSinceEpoch() << "stack-key" << (copy ? "copy" : "paste") << "terminal=" << targetTerminal << "image=" << image;
     afterKeys = std::move(next);
     keyRunning = true;
     deadline.start(1200);

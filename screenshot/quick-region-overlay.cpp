@@ -488,9 +488,10 @@ private:
         const QImage selected = desktop.copy(imageRect);
         const bool toStack = appendSelection;
         closeOverlay();
-        offerImage(selected);
         if (toStack) stack.appendImage(selected);
-        logLine(QStringLiteral("clipboard-offer-direct rect=%1,%2 %3x%4 native=%5x%6 release_ms=%7 copy_and_offer_ms=%8").arg(clipped.x()).arg(clipped.y()).arg(clipped.width()).arg(clipped.height()).arg(selected.width()).arg(selected.height()).arg(releaseMs).arg(timer.elapsed() - releaseMs));
+        else offerImage(selected);
+        const QString event = toStack ? QStringLiteral("stack-capture-queued") : QStringLiteral("clipboard-offer-direct");
+        logLine(event + QStringLiteral(" rect=%1,%2 %3x%4 native=%5x%6 release_ms=%7 copy_and_queue_or_offer_ms=%8").arg(clipped.x()).arg(clipped.y()).arg(clipped.width()).arg(clipped.height()).arg(selected.width()).arg(selected.height()).arg(releaseMs).arg(timer.elapsed() - releaseMs));
     }
     void closeOverlay() {
         appendSelection = false;
