@@ -81,6 +81,7 @@ rm -f -- "$HOME/.config/systemd/user/quick-region-overlay.service" \
     "$HOME/.local/share/applications/quick-region-overlay.desktop" "$HOME/.local/libexec/quick-region-overlay"
 systemctl --user daemon-reload
 unregister_shortcut quick-region-overlay capture-region
+for stack_action in "${stack_actions[@]}"; do unregister_shortcut quick-region-overlay "$stack_action"; done
 fail_point after-daemon-removed
 
 if [[ $fresh == 1 ]]; then

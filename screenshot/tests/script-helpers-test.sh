@@ -451,6 +451,19 @@ expect 'the note only once' '' "$(print_relogin_note 'Log out')"
 
 [[ $(rollback_command originals) == "$source_dir/rollback.sh --originals" && $(rollback_command spectacle-fast) == "$source_dir/rollback.sh" ]] ||
     { echo 'FAIL: rollback commands'; failures=$((failures + 1)); }
+(
+    mkdir -p "$HOME/.local/libexec"
+    install -m755 /usr/bin/python3 "$HOME/.local/libexec/quick-region-overlay"
+    "$HOME/.local/libexec/quick-region-overlay" -c 'import time; time.sleep(30)' & probe_pid=$!
+    trap 'kill "$probe_pid" 2>/dev/null || true; wait "$probe_pid" 2>/dev/null || true' EXIT
+    systemctl() { printf '%s\n' "$probe_pid"; }
+    wait_for 30 daemon_executable_current || exit 1
+    kill -0 "$probe_pid" || exit 1
+    install -m755 /usr/bin/python3 "$HOME/.local/libexec/replacement"
+    mv "$HOME/.local/libexec/replacement" "$HOME/.local/libexec/quick-region-overlay"
+    kill -0 "$probe_pid" || exit 1
+    if daemon_executable_current; then echo 'FAIL: a deleted executable was considered current'; exit 1; fi
+) || { echo 'FAIL: detecting an interrupted binary replacement'; failures=$((failures + 1)); }
 check 'the fast backup is complete' 0 check_backup spectacle-fast
 spectacle_fast_backup=$HOME/missing; check 'a missing backup is refused' 1 check_backup spectacle-fast
 

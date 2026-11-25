@@ -13,10 +13,11 @@
 namespace DaemonLogic {
 
 // Only quick-region-overlay.service runs --daemon; --capture asks it for a capture over D-Bus.
-enum class Command { Capture, Daemon, Usage };
+enum class Command { Capture, Daemon, HoldClipboard, Usage };
 inline Command parseCommand(const QStringList &args) {
     if (args == QStringList{QStringLiteral("--capture")}) return Command::Capture;
     if (args == QStringList{QStringLiteral("--daemon")}) return Command::Daemon;
+    if (args.size() == 2 && args[0] == QLatin1String("--hold-clipboard") && !args[1].isEmpty()) return Command::HoldClipboard;
     return Command::Usage;
 }
 // Exit status for a usage error, and for "another daemon owns the name", which the unit's RestartPreventExitStatus

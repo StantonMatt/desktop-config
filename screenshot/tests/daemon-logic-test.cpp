@@ -12,6 +12,10 @@ private slots:
     void commands() {
         QCOMPARE(parseCommand({QStringLiteral("--capture")}), Command::Capture);
         QCOMPARE(parseCommand({QStringLiteral("--daemon")}), Command::Daemon);
+        QCOMPARE(parseCommand({QStringLiteral("--hold-clipboard"), QStringLiteral("/tmp/snapshot.qrs")}), Command::HoldClipboard);
+        QCOMPARE(parseCommand({QStringLiteral("--hold-clipboard")}), Command::Usage);
+        QCOMPARE(parseCommand({QStringLiteral("--hold-clipboard"), QString()}), Command::Usage);
+        QCOMPARE(parseCommand({QStringLiteral("--hold-clipboard"), QStringLiteral("file"), QStringLiteral("extra")}), Command::Usage);
         QCOMPARE(parseCommand({}), Command::Usage);
         QCOMPARE(parseCommand({QStringLiteral("--daemon"), QStringLiteral("--capture")}), Command::Usage);
         QCOMPARE(parseCommand({QStringLiteral("--capture"), QStringLiteral("extra")}), Command::Usage);

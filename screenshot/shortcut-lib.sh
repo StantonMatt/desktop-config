@@ -4,6 +4,8 @@
 shopt -s inherit_errexit
 meta_shift_s_code=301989971 # Meta+Shift+S
 print_code=16777225 # Print (Qt::Key_Print)
+stack_actions=(stack-copy stack-capture stack-paste stack-clear)
+stack_codes=(201326659 201326675 201326678 201326680) # Ctrl+Alt+C/S/V/X
 launcher_entry="$HOME/.local/share/applications/quick-region-screenshot-v3.desktop"
 launcher_relative=.local/share/applications/quick-region-screenshot-v3.desktop
 launcher_owner=quick-region-screenshot-v3.desktop/_launch
@@ -386,6 +388,13 @@ state_running() { [[ $1 == active ]]; }
 state_needs_stop() { [[ $1 != inactive && $1 != failed ]]; }
 daemon_running() { state_running "$(unit_state quick-region-overlay.service)"; }
 daemon_needs_stop() { state_needs_stop "$(unit_state quick-region-overlay.service)"; }
+# A retry after replacing the binary must restart an old process, even when the installed bytes already match.
+# Bash -ef follows /proc/<pid>/exe and compares inodes, including when the running executable has been deleted.
+daemon_executable_current() {
+    local pid
+    pid=$(systemctl --user show -P MainPID quick-region-overlay.service) || return 1
+    [[ $pid =~ ^[0-9]+$ && $pid != 0 && /proc/$pid/exe -ef $HOME/.local/libexec/quick-region-overlay ]]
+}
 # Restarts the daemon from any state. reset-failed clears a failed state and its start limit, so a unit that failed
 # repeatedly starts again instead of being refused.
 restart_daemon() {
