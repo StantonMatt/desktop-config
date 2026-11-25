@@ -31,6 +31,18 @@ private slots:
         const auto right = DaemonLogic::shortcutKeyEvents(false, false, KEY_RIGHTCTRL);
         QVERIFY(std::none_of(right.begin(), right.end(), [](const auto &e) { return e.code == KEY_LEFTCTRL; }));
         QVERIFY(std::any_of(right.begin(), right.end(), [](const auto &e) { return e.code == KEY_RIGHTCTRL && e.value == 1; }));
+        // Still-held Alt is pressed again after Ctrl+V, so holding Ctrl+Alt keeps the next shortcut working.
+        const auto held = DaemonLogic::restoredModifiers([](int key) { return key == KEY_LEFTALT || key == KEY_LEFTMETA; });
+        QCOMPARE(held, QList<quint16>({KEY_LEFTALT}));
+        const auto again = DaemonLogic::shortcutKeyEvents(false, false, KEY_LEFTCTRL, KEY_LEFTSHIFT, held);
+        qsizetype ctrlUp = -1, altDown = -1, altUp = -1;
+        for (qsizetype i = 0; i < again.size(); ++i) {
+            if (again[i].code == KEY_LEFTCTRL && again[i].value == 0) ctrlUp = i;
+            if (again[i].code == KEY_LEFTALT && again[i].value == 1) altDown = i;
+            if (again[i].code == KEY_LEFTALT && again[i].value == 0 && altUp < 0) altUp = i;
+        }
+        QVERIFY(altUp >= 0 && altUp < ctrlUp && ctrlUp < altDown);
+        QCOMPARE(again.last().type, quint16(EV_SYN));
     }
     void commands() {
         QCOMPARE(parseCommand({QStringLiteral("--capture")}), Command::Capture);

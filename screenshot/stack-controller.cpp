@@ -98,7 +98,7 @@ bool writeShortcutKeys(int fd, bool copy, bool shift) {
     const auto ctrl = DaemonLogic::freeModifierKey(down(KEY_LEFTCTRL), KEY_LEFTCTRL, KEY_RIGHTCTRL);
     const auto shiftKey = DaemonLogic::freeModifierKey(down(KEY_LEFTSHIFT), KEY_LEFTSHIFT, KEY_RIGHTSHIFT);
     QList<input_event> events;
-    for (const auto &key : DaemonLogic::shortcutKeyEvents(copy, shift, ctrl, shiftKey)) {
+    for (const auto &key : DaemonLogic::shortcutKeyEvents(copy, shift, ctrl, shiftKey, DaemonLogic::restoredModifiers(down))) {
         input_event event{};
         event.type = key.type;
         event.code = key.code;
