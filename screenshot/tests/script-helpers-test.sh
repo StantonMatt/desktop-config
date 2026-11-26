@@ -56,6 +56,14 @@ expect() { # description, expected output, actual output
     expect 'rollback restores custom length' 17 "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems)"
     expect 'rollback restores custom image preference' true "$(kreadconfig6 --file klipperrc --group General --key IgnoreImages)"
     expect 'unrelated Klipper settings survive' untouched "$(kreadconfig6 --file klipperrc --group General --key Unrelated)"
+    kwriteconfig6 --file klipperrc --group General --key MaxClipItems 250
+    install_klipper_settings
+    expect 'longer custom length is kept' 250 "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems)"
+    kwriteconfig6 --file klipperrc --group General --key MaxClipItems 200
+    install_klipper_settings
+    expect 'rerun keeps a longer length chosen later' 200 "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems)"
+    restore_klipper_settings
+    expect 'rollback restores the original length' 250 "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems)"
     kwriteconfig6 --file klipperrc --group General --key MaxClipItems 55
     restore_klipper_settings
     expect 'second rollback keeps later user change' 55 "$(kreadconfig6 --file klipperrc --group General --key MaxClipItems)"
