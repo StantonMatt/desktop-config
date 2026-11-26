@@ -61,7 +61,7 @@ reload_klipper_settings() {
     esac
 }
 install_klipper_settings() {
-    local record="${state_dir:?}/klipper-settings.json" count images
+    local record="${state_dir:?}/klipper-settings.json" count images current
     validate_klipper_record
     if [[ ! -f $record ]] || [[ $(jq -r '.active' "$record") == false ]]; then
         count=$(klipper_value_json MaxClipItems) || fail 'Could not read Klipper history length.'
@@ -70,7 +70,13 @@ install_klipper_settings() {
             '{active: true, values: {MaxClipItems: $count, IgnoreImages: $images}}' >"$record.tmp" &&
             mv -- "$record.tmp" "$record") || fail 'Could not record previous Klipper settings.'
     fi
-    kwriteconfig6 --file klipperrc --group General --key MaxClipItems 40
+    # Raise the effective history length to at least 40, never lower it: shrinking discards older entries,
+    # and a rerun (the documented update step) would otherwise undo a longer length chosen in Mattux.
+    current=$(kreadconfig6 --file klipperrc --group General --key MaxClipItems --default 0) ||
+        fail 'Could not read Klipper history length.'
+    if [[ ! $current =~ ^[0-9]{1,9}$ ]] || ((10#$current < 40)); then
+        kwriteconfig6 --file klipperrc --group General --key MaxClipItems 40
+    fi
     kwriteconfig6 --file klipperrc --group General --key IgnoreImages --type bool false
     reload_klipper_settings
 }
